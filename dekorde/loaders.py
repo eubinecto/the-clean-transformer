@@ -8,6 +8,7 @@ import csv
 def load_gibberish2kor() -> List[Tuple[str, str]]:
     with open(GIBBERISH2KOR_TSV, 'r') as fh:
         tsv_reader = csv.reader(fh, delim="\t")
+        next(tsv_reader)  # skip the header
         return [
             (row[0], row[1])
             for row in tsv_reader

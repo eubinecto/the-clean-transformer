@@ -1,5 +1,7 @@
 from typing import List, Tuple
 import torch
+from keras_preprocessing.text import Tokenizer
+from keras_preprocessing.sequence import pad_sequences
 
 
 def build_X(gibberish2kor: List[Tuple[str, str]], device: torch.device) -> torch.Tensor:

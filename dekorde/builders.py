@@ -12,13 +12,21 @@ def build_I(sents: List[str], tokenizer: Tokenizer, max_length: int, device: tor
     return torch.LongTensor(seqs).to(device)
 
 
-def build_M(data_size: int, max_length: int, device: torch.device) -> torch.Tensor:
+def build_X(gibs: List[str], tokenizer: Tokenizer, max_length: int, device: torch.device) -> torch.LongTensor:
+    return build_I(gibs, tokenizer, max_length, device)
+
+
+def build_Y(kors: List[str], tokenizer: Tokenizer, max_length: int, device: torch.device) -> torch.LongTensor:
+    Y = build_I(kors, tokenizer, max_length, device)
+    torch.val
+    Y_r = Y[:, :-1]  # right-shifted
+
+
+def build_M(max_length: int, device: torch.device) -> torch.Tensor:
     """
-    :param data_size: N
     :param max_length: L
     :param device:
-    :return: M (N, L, L)  - 3차원?
+    :return: M (L, L)
     """
-    M = torch.tril(torch.ones(size=(max_length, max_length)), diagonal=0)\
-             .expand(data_size, max_length, max_length)
+    M = torch.tril(torch.ones(size=(max_length, max_length)), diagonal=0)
     return M.to(device)

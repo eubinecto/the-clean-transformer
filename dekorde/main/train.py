@@ -18,25 +18,26 @@ def main():
     # ---build the data --- #
     gib2kor = load_gib2kor()
     gibs = [gib for gib, _ in gib2kor]
-    kors = [kor for _, kor in gib2kor]
+    kors = ["s" + kor for _, kor in gib2kor]  # s stands for "start of the sequence"
     tokenizer = Tokenizer(char_level=True)
     tokenizer.fit_on_texts(texts=gibs + kors)
     vocab_size = len(tokenizer.word_index.keys())
-    X = build_X(gibs, tokenizer, max_length, device)
-    Y = build_Y(kors, tokenizer, max_length, device)
-    M = build_M(max_length, device)
+    X = build_X(gibs, tokenizer, max_length, device)  # (N, L)
+    Y = build_Y(kors, tokenizer, max_length, device)  # (N, 2, L)
+    M = build_M(max_length, device)  # (L, L)
 
     # --- instantiate the model and the optimizer --- #
     transformer = Transformer(hidden_size, vocab_size, max_length, heads, depth, M)
     optimizer = torch.optim.Adam(params=transformer.parameters(), lr=lr)
 
     # --- start training --- #
-    for epoch in conf['epochs']:
+    for epoch in range(conf['epochs']):
         # compute the loss.
-        loss = transformer.training_step(X, Y, M)
+        loss = transformer.training_step(X, Y)
         loss.backward()  # backprop
         optimizer.step()  # gradient descent
         optimizer.zero_grad()  # prevent the gradients accumulating.
+        print(f"epoch:{epoch}, loss:{loss}")
 
 
 if __name__ == '__main__':

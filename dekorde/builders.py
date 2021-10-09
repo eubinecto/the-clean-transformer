@@ -17,16 +17,16 @@ def build_X(gibs: List[str], tokenizer: Tokenizer, max_length: int, device: torc
 
 
 def build_Y(kors: List[str], tokenizer: Tokenizer, max_length: int, device: torch.device) -> torch.LongTensor:
-    Y = build_I(kors, tokenizer, max_length, device)
-    torch.val
-    Y_r = Y[:, :-1]  # right-shifted
+    Y_l = build_I(["s" + kor[:-1] for kor in kors], tokenizer, max_length, device)
+    Y_r = build_I(kors, tokenizer, max_length, device)
+    return torch.stack([Y_l, Y_r], dim=1).long()
 
 
-def build_M(max_length: int, device: torch.device) -> torch.Tensor:
+def build_M(max_length: int, device: torch.device) -> torch.LongTensor:
     """
     :param max_length: L
     :param device:
     :return: M (L, L)
     """
     M = torch.tril(torch.ones(size=(max_length, max_length)), diagonal=0)
-    return M.to(device)
+    return M.long().to(device)

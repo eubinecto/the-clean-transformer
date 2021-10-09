@@ -8,7 +8,7 @@ class FeedForward(torch.nn.Module):
     """
     def __init__(self, hidden_size: int):
         super().__init__()
-        layers = torch.nn.Sequential(
+        self.layers = torch.nn.Sequential(
             torch.nn.Linear(hidden_size, 2048),
             torch.nn.ReLU(),
             torch.nn.Linear(2048, hidden_size)

@@ -60,11 +60,11 @@ class MultiHeadAttentionLayer(torch.nn.Module):
         Q /= np.sqrt(self.hidden_size)
         K /= np.sqrt(self.hidden_size)
         Sims = torch.einsum("neax,nebx->neab", Q, K)  # ... -> (N, heads, L, L)
-        if self.M:  # masked self attention
+        if self.M is not None:  # masked self attention
             Sims[self.M.expand(N, self.heads, self.max_length, self.max_length)] = float("-inf")
         Attentions = torch.softmax(Sims, dim=2)  # (N, heads, L, L)
         # (N, heads, L, L) * (N, heads, L,  H // heads) -> (N, heads, L,  H // heads)
         Contexts = torch.einsum("neab,neax->neax", Attentions, V)
-        Concats = Contexts.reshape(N, self.max_length, self.heads)  # ... -> (N, L, H)
+        Concats = Contexts.reshape(N, self.max_length, self.hidden_size)  # ... -> (N, L, H)
         H_all = self.W_o(Concats)  # (N, L, H) * (H, H) -> (N, L, H)
         return H_all

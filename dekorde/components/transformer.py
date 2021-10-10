@@ -10,11 +10,7 @@ class Transformer(torch.nn.Module):
                  max_length: int, heads: int, depth: int, lookahead_mask: torch.Tensor):
         super().__init__()
         # --- hyper parameters --- #
-        self.hidden_size = hidden_size
-        self.vocab_size = vocab_size
         self.max_length = max_length
-        self.heads = heads
-        self.depth = depth
         # --- layers to optimise --- #
         self.token_embeddings = torch.nn.Embedding(num_embeddings=vocab_size, embedding_dim=hidden_size)
         self.pos_embeddings = torch.nn.Embedding(num_embeddings=max_length, embedding_dim=hidden_size)
@@ -38,15 +34,15 @@ class Transformer(torch.nn.Module):
     def predict(self, X, Y: torch.Tensor) -> torch.Tensor:
         """
         :param X: (N, L)
-        :param Y: (N, L). right-shifted.
-        :return: Y_pred (N, L, |V|)
+        :param Y: (N, L)
+        :return: Y_pred (N, |V|, L)
         """
         H_y = self.forward(X, Y)  # (N, L, H)
         W_hy = self.token_embeddings.weight  # (|V|, H)
         # reduce the matrices over the dimension H.
-        logits = torch.einsum("abc,dc->abd", H_y, W_hy)  # (N, L, |V|)
-        Y_pred = torch.softmax(logits, dim=1)
-        return Y_pred
+        # cross entropy of 3D input? - https://stackoverflow.com/a/63650146
+        logits = torch.einsum("abc,dc->adb", H_y, W_hy)  # (N, |V|, L)
+        return logits
 
     def training_step(self, X: torch.Tensor, Y: torch.Tensor) -> torch.Tensor:
         """
@@ -57,9 +53,7 @@ class Transformer(torch.nn.Module):
         """
         Y_l = Y[:, 0]  # starts from "s", ends just before the last character.
         Y_r = Y[:, 1]  # starts after "s", ends with the last character.
-        Y_pred = self.predict(X, Y_l)  # (N, L), (N, 2, L) -> (N, L, |V|)
-        # cross entropy of 3D input? - https://stackoverflow.com/a/63650146
-        Y_pred = torch.einsum("abc->acb", Y_pred)  # (N, L, |V|)  -> (N, |V|, L)
-        loss = F.cross_entropy(Y_pred, Y_r)  # (N, |V|, L), (N, L) -> (N, 1)
+        logits = self.predict(X, Y_l)  # (N, L), (N, L) -> (N, |V|, L)
+        loss = F.cross_entropy(logits, Y_r)  # (N, |V|, L), (N, L) -> (N, 1)
         loss = loss.sum()  # (N, 1) -> (1,)
         return loss

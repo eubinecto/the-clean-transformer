@@ -11,13 +11,13 @@ class MultiHeadAttentionLayer(torch.nn.Module):
     def __init__(self, embed_size: int, hidden_size: int, heads: int):
         super().__init__()
         self.embed_size = embed_size
-        self.hidden_size = hidden_size
         self.heads = heads
         # any layers to optimise? - four linear layers in total.
         # TODO - define the shape of the weights.
-        self.W_q = torch.nn.Linear(..., ...)
-        self.W_k = torch.nn.Linear(..., ...)
-        self.W_v = torch.nn.Linear(..., ...)
+        self.W_q = torch.nn.Linear(self.embed_size, ...)        #
+        self.W_k = torch.nn.Linear(..., ...)        #
+        self.W_v = torch.nn.Linear(..., ...)        #
+
         self.W_o = torch.nn.Linear(..., ...)  # for aggregating the multi-head outputs.
 
     def forward(self, EP_q: torch.Tensor, EP_k: torch.Tensor, EP_v: torch.Tensor, M: torch.Tensor = None) -> torch.Tensor:
@@ -28,9 +28,14 @@ class MultiHeadAttentionLayer(torch.nn.Module):
         :param M: (???) The mask.
         :return: H_all (N, L, H)
         """
+
+        if M is not None:
+            ...
+
         Q = self.W_q(EP_q)
         K = self.W_k(EP_k)
         V = self.W_v(EP_v)
+
         return self.scaled_dot_product_attention(Q, K, V, M)
 
     @staticmethod
@@ -46,7 +51,9 @@ class MultiHeadAttentionLayer(torch.nn.Module):
         :return: H_all (N, L, H)
         """
         d_k = Q.size(-1)
-        scores: torch.tensor = torch.matmul(Q, K.transpose(-2, -1)) / math.sqrt(d_k)        # 수식에 적혀있는 그대로 구현.
+
+        # 수식에 적혀있는 그대로 구현.
+        scores: torch.tensor = torch.matmul(Q, K.transpose(-2, -1)) / math.sqrt(d_k)
         if M is not None:
             scores = scores.masked_fill(M == 0, -1e9)        # M =
         prob_attn = F.softmax(scores, dim=-1)               # 어텐션 확률

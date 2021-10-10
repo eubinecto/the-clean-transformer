@@ -4,8 +4,13 @@ from keras_preprocessing.text import Tokenizer
 from keras_preprocessing.sequence import pad_sequences
 
 
-def build_I(sents: List[str], tokenizer, max_length, device) -> torch.Tensor:
+def build_I(sents: List[str],
+            tokenizer: Tokenizer,
+            max_length: int,
+            device: torch.device) -> torch.Tensor:
     """
+    This function converts raw human readable sentences to machine readable sequences
+    Keras Text preprocessing module includes Tokenizer class that helps ease of converting text to sequence.
 
     :param sents:
     :param tokenizer:
@@ -13,14 +18,27 @@ def build_I(sents: List[str], tokenizer, max_length, device) -> torch.Tensor:
     :param device:
     :return:
     """
-    pass
+    return torch.LongTensor(
+        # padding 추가 (뒤에)
+        pad_sequences(
+            sequences=tokenizer.texts_to_sequences(texts=sents),
+            maxlen=max_length,      # 시퀀스의 최대 길이
+            padding="post",         # padding 의 위치는?            뒤에
+            value=0                 # padding 은 어떤값으로 처리?     0
+        )
+    ).to(device)
 
 
-def build_M(gibberish2kor: List[Tuple[str, str]], device: torch.device) -> torch.Tensor:
+def build_M(sents: List[str],
+            max_sentence_length: int,
+            device: torch.device) -> torch.Tensor:
     """
-    :param gibberish2kor:
+    how to mask
+    :param sents:
+    :param max_sentence_length:
     :param device:
     :return: M (N, L, L)  - 3차원?
     """
-    # TODO - use torch.triu?
-    raise NotImplementedError
+
+    M = torch.tril(torch.ones(max_sentence_length, max_sentence_length)).repeat(len(sents), 1, 1)
+    return M.to(device)

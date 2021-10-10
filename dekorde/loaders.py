@@ -1,3 +1,4 @@
+from collections import namedtuple
 from typing import List, Tuple
 from dekorde.paths import CONF_JSON,  GIBBERISH2KOR_TSV
 import torch
@@ -18,7 +19,8 @@ def load_gibberish2kor() -> List[Tuple[str, str]]:
 def load_conf() -> dict:
     with open(CONF_JSON, 'r') as fh:
         conf = json.loads(fh.read())
-    return conf
+
+    return namedtuple('GenericDict', conf.keys())(**conf)
 
 
 def load_device() -> torch.device:

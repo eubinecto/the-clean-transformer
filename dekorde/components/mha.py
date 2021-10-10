@@ -11,11 +11,12 @@ class MultiHeadAttentionLayer(torch.nn.Module):
     this could be either masked or not.
     """
 
-    def __init__(self, d_model: int, head_size: int):
+    def __init__(self, d_model: int, head_size: int, is_masked: bool):
         super().__init__()
-
         # hidden size must be divisible by heads.
         assert d_model % head_size == 0
+
+        self.is_masked = is_masked
 
         self.head_size = head_size
         self.head_dim = d_model // self.head_size
@@ -37,22 +38,22 @@ class MultiHeadAttentionLayer(torch.nn.Module):
         self.W_o = torch.nn.Linear(self.d_model, self.d_model)
 
     def forward(self,
-                EP_q: torch.Tensor,
-                EP_k: torch.Tensor,
-                EP_v: torch.Tensor,
+                H_q: torch.Tensor,
+                H_k: torch.Tensor,
+                H_v: torch.Tensor,
                 M: torch.Tensor = None) -> torch.Tensor:
         """
-        :param EP_q: (N, L, d_model)
-        :param EP_k: (N, L, d_model)
-        :param EP_v: (N, L, d_model)
+        :param H_q: (N, L, d_model)
+        :param H_k: (N, L, d_model)
+        :param H_v: (N, L, d_model)
         :param M: (???) The mask.
         :return: H_all (N, L, H)
         """
 
         # ============ pass linear layer ============ #
-        Q = self.W_q(EP_q)  # (N, L, d_model) * (d_model, d_model) -> (N, L, d_model)
-        K = self.W_k(EP_k)  # (N, L, d_model) * (d_model, d_model) -> (N, L, d_model)
-        V = self.W_v(EP_v)  # (N, L, d_model) * (d_model, d_model) -> (N, L, d_model)
+        Q = self.W_q(H_q)  # (N, L, d_model) * (d_model, d_model) -> (N, L, d_model)
+        K = self.W_k(H_k)  # (N, L, d_model) * (d_model, d_model) -> (N, L, d_model)
+        V = self.W_v(H_v)  # (N, L, d_model) * (d_model, d_model) -> (N, L, d_model)
 
         # reshaping (N, L, E) -> (N, L, head_size, head_dim)
         # N: 배치 크기 (seq_len)
@@ -88,7 +89,7 @@ class MultiHeadAttentionLayer(torch.nn.Module):
         qk_attn_score: torch.Tensor = torch.einsum("nqhd,nkhd->nhqk", Q, K) / math.sqrt(self.head_dim)
 
         # Masking
-        if M is not None:
+        if self.is_masked:
             qk_attn_score = qk_attn_score.masked_fill(M == 0, -1e9)
 
         qk_attn_prob = F.softmax(qk_attn_score, dim=-1)

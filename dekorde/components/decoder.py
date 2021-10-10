@@ -5,10 +5,10 @@ from dekorde.components.ffn import FeedForward
 
 
 class DecoderLayer(torch.nn.Module):
-    def __init__(self, hidden_size: int, max_length: int, heads: int, M: torch.Tensor):
+    def __init__(self, hidden_size: int, max_length: int, heads: int, lookahead_mask: torch.Tensor):
         super().__init__()
         # masked, multi-head self-attention layer.
-        self.masked_mhsa_layer = MultiHeadAttentionLayer(hidden_size, max_length, heads, M)
+        self.masked_mhsa_layer = MultiHeadAttentionLayer(hidden_size, max_length, heads, lookahead_mask)
         self.norm_1 = torch.nn.LayerNorm(hidden_size)
         # not masked, multi-head encoder-decoder attention layer.
         self.mheda_layer = MultiHeadAttentionLayer(hidden_size, max_length, heads)
@@ -34,10 +34,10 @@ class DecoderLayer(torch.nn.Module):
 
 class Decoder(torch.nn.Module):
 
-    def __init__(self, hidden_size: int, max_length: int, heads: int, depth: int, M: torch.Tensor):
+    def __init__(self, hidden_size: int, max_length: int, heads: int, depth: int, lookahead_mask: torch.Tensor):
         super().__init__()
         self.layers = torch.nn.Sequential(
-            *[DecoderLayer(hidden_size, max_length, heads, M) for _ in range(depth)]
+            *[DecoderLayer(hidden_size, max_length, heads, lookahead_mask) for _ in range(depth)]
         )
 
     def forward(self, H_x: torch.Tensor, Y_embed: torch.Tensor) -> torch.Tensor:

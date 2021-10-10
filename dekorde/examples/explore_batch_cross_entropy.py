@@ -11,6 +11,7 @@ def main():
     Y_pred = torch.softmax(Y_pred, dim=2)
     Y = torch.randint(low=0, high=V, size=(N, L))
     print(Y[0])
+    # how do I...? how do I run them all?
     loss = F.cross_entropy(Y_pred, Y, ignore_index=1)
 
 

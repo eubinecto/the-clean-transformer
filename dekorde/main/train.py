@@ -1,6 +1,6 @@
 from dekorde.components.transformer import Transformer
 from dekorde.loaders import load_conf, load_device, load_gib2kor
-from dekorde.builders import build_X, build_Y, build_M
+from dekorde.builders import build_X, build_Y, build_lookahead_mask
 from keras_preprocessing.text import Tokenizer
 import torch
 
@@ -24,10 +24,10 @@ def main():
     vocab_size = len(tokenizer.word_index.keys())
     X = build_X(gibs, tokenizer, max_length, device)  # (N, L)
     Y = build_Y(kors, tokenizer, max_length, device)  # (N, 2, L)
-    M = build_M(max_length, device)  # (L, L)
+    lookahead_mask = build_lookahead_mask(max_length, device)  # (L, L)
 
     # --- instantiate the model and the optimizer --- #
-    transformer = Transformer(hidden_size, vocab_size, max_length, heads, depth, M)
+    transformer = Transformer(hidden_size, vocab_size, max_length, heads, depth, lookahead_mask)
     optimizer = torch.optim.Adam(params=transformer.parameters(), lr=lr)
 
     # --- start training --- #

@@ -22,11 +22,12 @@ def build_Y(kors: List[str], tokenizer: Tokenizer, max_length: int, device: torc
     return torch.stack([Y_l, Y_r], dim=1).long()
 
 
-def build_M(max_length: int, device: torch.device) -> torch.LongTensor:
+def build_lookahead_mask(max_length: int, device: torch.device) -> torch.LongTensor:
     """
+    build a look-ahead mask.
     :param max_length: L
     :param device:
-    :return: M (L, L)
+    :return: lookahead_mask (L, L)
     """
-    M = torch.tril(torch.ones(size=(max_length, max_length)), diagonal=0)
-    return M.long().to(device)
+    lookahead_mask = torch.tril(torch.ones(size=(max_length, max_length)), diagonal=0)
+    return lookahead_mask.long().to(device)

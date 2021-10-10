@@ -31,19 +31,6 @@ class Transformer(torch.nn.Module):
         H_y = self.decoder(H_x, Y_embed)  # (N, L, H) -> (N, L, H)
         return H_y
 
-    def predict(self, X, Y: torch.Tensor) -> torch.Tensor:
-        """
-        :param X: (N, L)
-        :param Y: (N, L)
-        :return: Y_pred (N, |V|, L)
-        """
-        H_y = self.forward(X, Y)  # (N, L, H)
-        W_hy = self.token_embeddings.weight  # (|V|, H)
-        # reduce the matrices over the dimension H.
-        # cross entropy of 3D input? - https://stackoverflow.com/a/63650146
-        logits = torch.einsum("abc,dc->adb", H_y, W_hy)  # (N, |V|, L)
-        return logits
-
     def training_step(self, X: torch.Tensor, Y: torch.Tensor) -> torch.Tensor:
         """
         A function for computing the loss for this batch.
@@ -53,7 +40,11 @@ class Transformer(torch.nn.Module):
         """
         Y_l = Y[:, 0]  # starts from "s", ends just before the last character.
         Y_r = Y[:, 1]  # starts after "s", ends with the last character.
-        logits = self.predict(X, Y_l)  # (N, L), (N, L) -> (N, |V|, L)
+        H_y = self.forward(X, Y_l)  # (N, L, H)
+        W_hy = self.token_embeddings.weight  # (|V|, H)
+        # reduce the matrices over the dimension H.
+        # cross entropy of 3D input? - https://stackoverflow.com/a/63650146
+        logits = torch.einsum("abc,dc->adb", H_y, W_hy)  # (N, |V|, L)
         loss = F.cross_entropy(logits, Y_r)  # (N, |V|, L), (N, L) -> (N, 1)
         loss = loss.sum()  # (N, 1) -> (1,)
         return loss

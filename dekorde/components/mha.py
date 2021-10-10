@@ -47,9 +47,9 @@ class MultiHeadAttentionLayer(torch.nn.Module):
         """
         d_k = Q.size(-1)
         scores: torch.tensor = torch.matmul(Q, K.transpose(-2, -1)) / math.sqrt(d_k)        # 수식에 적혀있는 그대로 구현.
-        if M:  # if not None.
-            scores = scores.masked_fill(M == 0, -1e9)        # M == 0 의 조건을 충족한다면 scores 에 해당 위치의 값을 -1e9로 대체.
+        if M is not None:
+            scores = scores.masked_fill(M == 0, -1e9)        # M =
         prob_attn = F.softmax(scores, dim=-1)               # 어텐션 확률
 
-        raise torch.matmul(prob_attn, V)
+        return torch.matmul(prob_attn, V)
 

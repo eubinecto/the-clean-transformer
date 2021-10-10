@@ -1,4 +1,7 @@
+import math
+
 import torch
+import torch.nn.functional as F
 
 
 class MultiHeadAttentionLayer(torch.nn.Module):
@@ -30,8 +33,8 @@ class MultiHeadAttentionLayer(torch.nn.Module):
         V = self.W_v(EP_v)
         return self.scaled_dot_product_attention(Q, K, V, M)
 
-    def scaled_dot_product_attention(self,
-                                     Q: torch.Tensor,
+    @staticmethod
+    def scaled_dot_product_attention(Q: torch.Tensor,
                                      K: torch.Tensor,
                                      V: torch.Tensor,
                                      M: torch.Tensor = None) -> torch.Tensor:
@@ -42,10 +45,11 @@ class MultiHeadAttentionLayer(torch.nn.Module):
         :param M: (???)
         :return: H_all (N, L, H)
         """
-        # TODO
-        ...
+        d_k = Q.size(-1)
+        scores: torch.tensor = torch.matmul(Q, K.transpose(-2, -1)) / math.sqrt(d_k)        # 수식에 적혀있는 그대로 구현.
         if M:  # if not None.
-            ...
-        ...
-        raise NotImplementedError
+            scores = scores.masked_fill(M == 0, -1e9)        # M == 0 의 조건을 충족한다면 scores 에 해당 위치의 값을 -1e9로 대체.
+        prob_attn = F.softmax(scores, dim=-1)               # 어텐션 확률
+
+        raise torch.matmul(prob_attn, V)
 

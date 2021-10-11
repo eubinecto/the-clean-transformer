@@ -1,47 +1,68 @@
 import torch
+import torch.nn as nn
 from dekorde.components.mha import MultiHeadAttentionLayer
 
 
 class DecoderLayer(torch.nn.Module):
-    def __init__(self, embed_size: int, hidden_size: int, heads: int):
+    def __init__(self, d_model: int, head_size: int, mask: torch.Tensor):
+        self.ffn_inner_dim = 2048
+        self.mask = mask
+
         super().__init__()
-        self.embed_size = embed_size
-        self.hidden_size = hidden_size
-        self.heads = heads
+        self.d_model = d_model
+        self.head_size = head_size
         # any layers to optimise?
         # masked
-        self.masked_multi_head_self_attention_layer = MultiHeadAttentionLayer(embed_size, hidden_size, heads)
-        self.norm_1 = torch.nn.LayerNorm(...)
+        self.multi_head_self_attn = MultiHeadAttentionLayer(d_model=d_model,
+                                                            head_size=head_size,
+                                                            is_masked=False)
+        self.norm_for_self_attn = torch.nn.LayerNorm(d_model)
         # not masked
-        self.multi_head_encoder_decoder_attention_layer = MultiHeadAttentionLayer(embed_size, hidden_size, heads)
-        self.norm_2 = torch.nn.LayerNorm(...)
-        self.ffn = torch.nn.Linear(..., ...)
-        self.norm_3 = torch.nn.LayerNorm(...)
+        self.multi_head_enc_dec_attn = MultiHeadAttentionLayer(d_model=d_model,
+                                                               head_size=head_size,
+                                                               is_masked=True)
+        self.norm_for_enc_dec_attn = torch.nn.LayerNorm(d_model)
+        self.ffn = nn.Sequential(
+            nn.Linear(d_model, self.ffn_inner_dim),
+            nn.ReLU(),
+            nn.Linear(self.ffn_inner_dim, d_model)
+        )
+        self.norm_for_ffn = torch.nn.LayerNorm(d_model)
 
-    def forward(self, Y_ep: torch.Tensor, H_all_x: torch.Tensor, M) -> torch.Tensor:
+    def forward(self, H_y: torch.Tensor, H_x_out: torch.Tensor, M) -> torch.Tensor:
         """
-        :param Y_ep: (N, L, E)
-        :param H_all_x: (N, L, H)
+        :param H_y: (N, L, E)
+        :param H_x_out: (N, L, H)
         :param M: (???)
         :return: H_all_t: (N, L, H)
         """
-        # TODO - residual connection, layer norm.
-        raise NotImplementedError
+        self_mha_out = self.multi_head_self_attn.forward(H_q=H_y, H_k=H_y, H_v=H_y, M=self.mask)
+        self_mha_layer_out = self.norm_for_self_attn(self_mha_out + H_y)
+
+        dec_enc_attn_out = self.multi_head_enc_dec_attn.forward(H_q=self_mha_layer_out,
+                                                                H_k=self_mha_layer_out,
+                                                                H_v=self_mha_layer_out)
+        dec_enc_attn_layer_out = self.norm_for_enc_dec_attn(dec_enc_attn_out + self_mha_layer_out)
+
+        ffn_out = self.ffn(dec_enc_attn_layer_out)
+        ffn_layer_out = self.norm_for_ffn(ffn_out + dec_enc_attn_layer_out)
+
+        return ffn_layer_out
 
 
 class Decoder(torch.nn.Module):
 
-    def __init__(self, embed_size: int, hidden_size: int, heads: int, depth: int):
+    def __init__(self, d_model: int, head_size: int, mask: torch.Tensor, depth: int):
         super().__init__()
         self.decoder_layers = torch.nn.Sequential(
-            *[DecoderLayer(embed_size, hidden_size, heads) for _ in range(depth)]
+            *[DecoderLayer(d_model, head_size, mask) for _ in range(depth)]
         )
 
-    def forward(self, Y_ep: torch.Tensor, H_all_x: torch.Tensor, M: torch.Tensor) -> torch.Tensor:
+    def forward(self, H_y: torch.Tensor, H_all_x: torch.Tensor, mask: torch.Tensor) -> torch.Tensor:
         """
-        :param Y_ep: (N, L, E)
+        :param H_y: (N, L, E)
         :param H_all_x: (N, L, H)
-        :param M: (???)
+        :param mask: (???)
         :return: H_all_t: (N, L, H)
         """
-        return self.decoder_layers(Y_ep, H_all_x, M)
+        return self.decoder_layers(H_y, H_all_x, mask)

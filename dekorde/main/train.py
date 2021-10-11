@@ -10,8 +10,8 @@ def main():
 
     # ========== loading conf ========== #
     device = load_device()
-    embed_size = conf.embed_size
-    heads = conf.heads
+    d_model = conf.embed_size
+    head_size = conf.heads
     depth = conf.depth
     epochs = conf.epochs
     max_length = conf.max_length
@@ -32,23 +32,26 @@ def main():
     X = build_I(gibs, tokenizer, max_length, device)  # (N, L)
     Y = build_I(kors, tokenizer, max_length, device)  # (N, L)
 
-    M = build_M()  # (N, L, L)
+    M = build_M(kors, head_size, max_length, device)  # (N, L, L)
 
     # ========== loading model & opts ========== #
     transformer = Transformer(
-        embed_size=embed_size,
-        vocab_size=...,
+        d_model=d_model,
+        vocab_size=vocab_size,
         max_length=max_length,
-        heads=heads,
-        depth=depth
+        head_size=head_size,
+        depth=depth,
+        mask=M
     )
-    optimizer = torch.optim.Adam(params=transformer.parameters(), lr=conf['lr'])
+    optimizer = torch.optim.Adam(params=transformer.parameters(), lr=lr)
 
-    for _ in epochs:
-        loss = transformer.training_step(X, Y, M)
+    print('START')
+    for epoch in range(epochs):
+        loss = transformer.training_step(X, Y)
         loss.backward()
         optimizer.step()
         optimizer.zero_grad()
+        print(f"epoch:{epoch}, loss:{loss}")
 
 
 if __name__ == '__main__':

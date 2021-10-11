@@ -50,6 +50,18 @@ def explore_transformer_forward():
 
     print(res)
 
+    logits = torch.einsum('nlh,vh->nlv', res, transformer.token_embeddings.weight)
+
+    print(logits)
+
+    probs = torch.softmax(logits, dim=0)
+
+    print(probs)
+
+    preds = torch.argmax(probs, dim=-1)
+
+    print(preds)
+
 
 if __name__ == '__main__':
     explore_transformer_forward()

@@ -1,4 +1,8 @@
+from typing import Tuple
+
 import torch
+import torch.nn.functional as F
+
 from dekorde.components.encoder import Encoder
 from dekorde.components.decoder import Decoder
 from dekorde.components.pos_encoder import PositionalEncoding
@@ -57,28 +61,40 @@ class Transformer(torch.nn.Module):
 
         return H_all_y
 
-    def predict(self, X: torch.Tensor, y: torch.Tensor) -> torch.Tensor:
+    def get_logits(self, X: torch.Tensor, y: torch.Tensor) -> torch.Tensor:
         """
-        :param y:
+        :param y: (N, L)
         :param X: (N, L, H)
-        :return: S (N, L, |V|)
+        :return: logits (N, L, |V|)
         """
-        H_y = self.forward(X, y)  # (N, L, H)
-        W_ = self.token_embeddings.weight  # (|V|, H)
-        Logits = torch.einsum("nlh,vh->nlv", H_y, W_hy)  # (N, L, |V|)
-        Y_hat = torch.softmax(Logits, dim=1)
-        return Y_hat
-        # S = torch.bmm(H_all_y, self.token_embeddings.weight.T.expand(N, V, H))
-        S = torch.einsum("nlh,vh->nlv", X, self.token_embeddings.weight)  # (N, L, H) * (|V|, E=H) -> (N, L, |V|)
+        H_y = self.forward(X, y)  # (N, L, d_model)
+        W_token_embed = self.token_embeddings.weight  # (|V|, d_model)
 
-    def training_step(self, X: torch.Tensor, Y: torch.Tensor, M: torch.Tensor) -> torch.Tensor:
+        logits = torch.einsum("nlh,vh->nlv", H_y, W_token_embed)  # (N, L, |V|)
+        return logits
+
+    def predict(self, X: torch.Tensor, y: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+        """
+        :param y: (N, L)
+        :param X: (N, L, H)
+        :return: logits (N, L, |V|)
+        """
+        logits = self.get_logits(X, y)
+        probs = torch.softmax(logits, dim=0)  # (N, L, |V|)
+        preds = torch.argmax(probs, dim=-1)  # (N, L)
+
+        return logits, probs, preds
+
+    def training_step(self, X: torch.Tensor, y: torch.Tensor) -> torch.Tensor:
         """
         :param X: (N, L) - source
-        :param Y: (N, L) - target
-        :param M: (???) - attention mask
+        :param y: (N, L) - target
         :return: loss (1,)
         """
-        H_all_y = self.forward(X, Y, M)
-        # TODO - compute the loss.
+        logits = self.get_logits(X, y)
+        logits = torch.einsum('nlv->nvl', logits)
 
-        raise NotImplementedError
+        loss = F.cross_entropy(logits, y)
+
+        return loss.sum()
+

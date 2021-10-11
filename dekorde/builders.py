@@ -42,5 +42,5 @@ def build_M(sents: List[str],
     :return: M (N, L, L)  - 3차원?
     """
 
-    M = torch.tril(torch.ones(head_size, head_size)).repeat(len(sents), max_sentence_length, 1, 1)
+    M = torch.tril(torch.ones(max_sentence_length, max_sentence_length)).repeat(len(sents), head_size, 1, 1)
     return M.to(device)

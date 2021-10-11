@@ -50,7 +50,9 @@ class MultiHeadAttentionLayer(torch.nn.Module):
         K = K.reshape(N, self.max_length, self.heads, self.hidden_size // self.heads)
         V = V.reshape(N, self.max_length, self.heads, self.hidden_size // self.heads)
         # compute the scaled dot product attention
-        return self.scaled_dot_product_attention(Q, K, V)
+        concats = self.scaled_dot_product_attention(Q, K, V)  # ... -> (N, L, H)
+        H_all = self.W_o(concats)  # (N, L, H) * (H, H) -> (N, L, H)
+        return H_all
 
     def scaled_dot_product_attention(self,
                                      Q: torch.Tensor,
@@ -65,7 +67,7 @@ class MultiHeadAttentionLayer(torch.nn.Module):
         :param Q: (N, L, heads, H // heads)
         :param K: (N, L, heads, H // heads)
         :param V: (N, L, heads, H // heads)
-        :return: H_all (N, L, H)
+        :return: concats (N, L, H)
         """
         N = Q.shape[0]
         # 행렬곱 전에 미리 scale.
@@ -88,5 +90,4 @@ class MultiHeadAttentionLayer(torch.nn.Module):
         contexts = torch.einsum("acij,ajcd->aicd", attentions, V)
         # heads, H // heads -> H로 reshape하면, 결국엔 concat한 것이랑 같은 결과.
         concats = contexts.reshape(N, self.max_length, self.hidden_size)  # ... -> (N, L, H)
-        H_all = self.W_o(concats)  # (N, L, H) * (H, H) -> (N, L, H)
-        return H_all
+        return concats

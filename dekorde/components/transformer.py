@@ -91,10 +91,12 @@ class Transformer(torch.nn.Module):
         :param y: (N, L) - target
         :return: loss (1,)
         """
-        logits = self.get_logits(X, y)
+        y_l = y[:, 0]  # left
+        y_r = y[:, 1]  # right
+        logits = self.get_logits(X, y_l)
         logits = torch.einsum('nlv->nvl', logits)
 
-        loss = F.cross_entropy(logits, y)
+        loss = F.cross_entropy(logits, y_r)
         loss = loss.sum()
         return loss
 

@@ -95,6 +95,6 @@ class Transformer(torch.nn.Module):
         logits = torch.einsum('nlv->nvl', logits)
 
         loss = F.cross_entropy(logits, y)
-
-        return loss.sum()
+        loss = loss.sum()
+        return loss
 

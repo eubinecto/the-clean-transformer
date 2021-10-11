@@ -33,5 +33,5 @@ class PositionalEncoding(nn.Module):
         self.positional_encoding = pos_enc.unsqueeze(0)
 
     def forward(self, x):
-        out = x + Variable(self.positional_encoding[:, :x.size(1)]).cuda()
+        out = x + Variable(self.positional_encoding[:, :x.size(1)])
         return self.dropout(out)

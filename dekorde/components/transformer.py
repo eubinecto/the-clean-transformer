@@ -17,6 +17,7 @@ class Transformer(torch.nn.Module):
         self.encoder = Encoder(hidden_size, max_length, heads, depth)  # the encoder stack
         self.decoder = Decoder(hidden_size, max_length, heads, depth, lookahead_mask)  # the decoder stack
 
+
     def forward(self, X: torch.Tensor, Y: torch.Tensor) -> torch.Tensor:
         """
         :param X: (N, L)
@@ -31,7 +32,8 @@ class Transformer(torch.nn.Module):
         H_y = self.decoder(H_x, Y_embed)  # (N, L, H) -> (N, L, H)
         return H_y
 
-    def training_step(self, X: torch.Tensor, Y: torch.Tensor) -> torch.Tensor:
+
+    def training_step(self, X: torch.Tensor, Y: torch.Tensor, M: torch.Tensor) -> torch.Tensor:
         """
         A function for computing the loss for this batch.
         :param X: (N, L) - source

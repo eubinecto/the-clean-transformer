@@ -22,6 +22,7 @@ def build_Y(kors: List[str], tokenizer: Tokenizer, max_length: int, device: torc
     return torch.stack([Y_l, Y_r], dim=1).long()
 
 
+
 def build_lookahead_mask(max_length: int, device: torch.device) -> torch.LongTensor:
     """
     build a look-ahead mask.

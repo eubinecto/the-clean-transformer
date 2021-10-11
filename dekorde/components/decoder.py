@@ -40,8 +40,8 @@ class DecoderLayer(torch.nn.Module):
         self_mha_layer_out = self.norm_for_self_attn(self_mha_out + H_y)
 
         dec_enc_attn_out = self.multi_head_enc_dec_attn.forward(H_q=self_mha_layer_out,
-                                                                H_k=self_mha_layer_out,
-                                                                H_v=self_mha_layer_out)
+                                                                H_k=H_x_out,
+                                                                H_v=H_x_out)
         dec_enc_attn_layer_out = self.norm_for_enc_dec_attn(dec_enc_attn_out + self_mha_layer_out)
 
         ffn_out = self.ffn(dec_enc_attn_layer_out)

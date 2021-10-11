@@ -49,7 +49,7 @@ class DecoderLayer(torch.nn.Module):
         ffn_out = self.ffn(dec_enc_attn_layer_out)
         ffn_layer_out = self.norm_for_ffn(ffn_out + dec_enc_attn_layer_out)
 
-        return H_x_out, ffn_layer_out
+        return ffn_layer_out, H_x_out
 
 
 class Decoder(torch.nn.Module):
@@ -68,6 +68,6 @@ class Decoder(torch.nn.Module):
         :param H_x_out: (N, L, H)
         :return: H_all_t: (N, L, H)
         """
-        _, out = self.decoder_layers((H_y, H_x_out))
+        out, _ = self.decoder_layers((H_y, H_x_out))
 
         return out

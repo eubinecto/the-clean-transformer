@@ -3,8 +3,6 @@ import math
 import torch
 import torch.nn.functional as F
 
-from torchtyping import TensorType
-
 
 class MultiHeadAttentionLayer(torch.nn.Module):
     """

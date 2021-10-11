@@ -42,7 +42,7 @@ def main():
         head_size=head_size,
         depth=depth,
         mask=M
-    )
+    ).cuda()
     optimizer = torch.optim.Adam(params=transformer.parameters(), lr=lr)
 
     print('START')

@@ -1,9 +1,9 @@
-from dekorde.loaders import load_gibberish2kor
+from dekorde.loaders import load_gib2kor
 from pprint import pprint
 
 
 def main():
-    pprint(load_gibberish2kor())
+    pprint(load_gib2kor())
 
 
 if __name__ == '__main__':

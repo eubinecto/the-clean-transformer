@@ -13,7 +13,7 @@ def main():
     # multi-head scores.
     S = torch.randn(size=(N, heads, L, L))
     # 아하, 간단하네.
-    S[lookahead_mask.expand(N, heads, L, L) == 0] = float("-inf")
+    S = torch.masked_fill(S, lookahead_mask == 0, value=float("-inf"))
     print(S)
 
 

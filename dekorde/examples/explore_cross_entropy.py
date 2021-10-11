@@ -4,8 +4,6 @@ import torch
 
 
 def main():
-    N = 10
-    V = 20
     Y_pred = torch.FloatTensor([
         [10000, float("-inf"), float("-inf")],
         [float("-inf"), 10000, float("-inf")]

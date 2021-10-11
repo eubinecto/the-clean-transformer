@@ -7,6 +7,7 @@ class MultiHeadAttentionLayer(torch.nn.Module):
     """
     this could be either masked or not.
     """
+
     def __init__(self, hidden_size: int, max_length: int, heads: int,
                  lookahead_mask: Optional[torch.Tensor] = None):
         """
@@ -77,7 +78,9 @@ class MultiHeadAttentionLayer(torch.nn.Module):
         sims = torch.einsum("aicd,ajcd->acij", Q, K)
         if self.lookahead_mask is not None:  # masked self attention
             # 마스크로 가려지지 않은 부분은 전부 -inf로 대체.
-            sims[self.lookahead_mask.expand(N, self.heads, self.max_length, self.max_length) == 0] = float("-inf")
+            sims = sims.masked_fill(self.lookahead_mask.expand(N, self.heads, self.max_length, self.max_length) == 0,
+                                    float("-inf"))
+
         attentions = torch.softmax(sims, dim=2)  # (N, heads, L, L), normalise over L (the first one)
         # (N, heads, L, L) * (N, L, heads,  H // heads) -> (N, L, heads, H // heads)
         # contexts_{aicd} = \sum_{j = 1}^{j = L}{attentions_{acij} * V_{ajcd}}

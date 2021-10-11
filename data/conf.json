@@ -1,5 +1,4 @@
 {
-  "hidden_size": 512,
   "embed_size": 512,
   "heads": 8,
   "depth": 10,

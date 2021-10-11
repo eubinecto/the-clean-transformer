@@ -1,17 +1,18 @@
-from dekorde.components.transformer import Transformer
-from dekorde.loaders import load_conf, load_device, load_gibberish2kor
-from dekorde.builders import build_I, build_M
-from keras_preprocessing.text import Tokenizer
 import torch
+from keras_preprocessing.text import Tokenizer
+
+from dekorde.builders import build_I, build_M
+from dekorde.components.transformer import Transformer
+from dekorde.loaders import load_device, load_conf, load_gibberish2kor
 
 
-def main():
+def explore_transformer_forward():
     conf = load_conf()
 
     # ========== loading conf ========== #
     device = load_device()
-    embed_size = conf.embed_size
-    heads = conf.heads
+    d_model = conf.embed_size
+    head_size = conf.heads
     depth = conf.depth
     epochs = conf.epochs
     max_length = conf.max_length
@@ -32,24 +33,23 @@ def main():
     X = build_I(gibs, tokenizer, max_length, device)  # (N, L)
     Y = build_I(kors, tokenizer, max_length, device)  # (N, L)
 
-    M = build_M()  # (N, L, L)
+    M = build_M(kors, max_length, head_size, device)  # (N, L, L)
 
     # ========== loading model & opts ========== #
     transformer = Transformer(
-        embed_size=embed_size,
-        vocab_size=...,
+        d_model=d_model,
+        vocab_size=vocab_size,
         max_length=max_length,
-        heads=heads,
-        depth=depth
+        head_size=head_size,
+        depth=depth,
+        mask=M
     )
-    optimizer = torch.optim.Adam(params=transformer.parameters(), lr=conf['lr'])
+    optimizer = torch.optim.Adam(params=transformer.parameters(), lr=lr)
 
-    for _ in epochs:
-        loss = transformer.training_step(X, Y, M)
-        loss.backward()
-        optimizer.step()
-        optimizer.zero_grad()
+    res = transformer.forward(X, Y)
+
+    print(res)
 
 
 if __name__ == '__main__':
-    main()
+    explore_transformer_forward()

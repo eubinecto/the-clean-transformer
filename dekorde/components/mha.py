@@ -45,7 +45,7 @@ class MultiHeadAttentionLayer(torch.nn.Module):
         """
         :param H_q: (N, L, d_model)
         :param H_k: (N, L, d_model)
-        :param H_v: (N, L, d_model)
+        :param H_v: (N,z L, d_model)
         :param M: (???) The mask.
         :return: H_all (N, L, H)
         """
@@ -58,15 +58,15 @@ class MultiHeadAttentionLayer(torch.nn.Module):
         # reshaping (N, L, E) -> (N, L, head_size, head_dim)
         # N: 배치 크기 (seq_len)
         # L: 문장 최대 길이
-        Q = Q.reshape(Q.shape(0), Q.shape(1), self.head_size, self.head_dim)
-        K = K.reshape(K.shape(0), K.shape(1), self.head_size, self.head_dim)
-        V = V.reshape(V.shape(0), V.shape(1), self.head_size, self.head_dim)
+        Q = Q.reshape(Q.size(0), Q.size(1), self.head_size, self.head_dim)
+        K = K.reshape(K.size(0), K.size(1), self.head_size, self.head_dim)
+        V = V.reshape(V.size(0), V.size(1), self.head_size, self.head_dim)
 
         # 각 헤드별 어텐션 결과
         attns = self.scaled_dot_product_attention(Q, K, V, M)
 
         # 헤드별 결과를 concat
-        concated_attns = attns.reshape(Q.shape(0), Q.shape(1), self.head_size * self.head_dim)
+        concated_attns = attns.reshape(Q.size(0), Q.size(1), self.head_size * self.head_dim)
 
         # 최종 아웃풋 linear layer 통과 결과
         return self.W_o(concated_attns)

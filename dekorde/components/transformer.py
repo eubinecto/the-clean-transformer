@@ -24,11 +24,10 @@ class Transformer(torch.nn.Module):
         self.encoder = Encoder(d_model, head_size, depth)  # the encoder stack
         self.decoder = Decoder(d_model, head_size, mask, depth)  # the decoder stack
 
-    def forward(self, X: torch.Tensor, Y: torch.Tensor, M: torch.Tensor) -> torch.Tensor:
+    def forward(self, X: torch.Tensor, Y: torch.Tensor) -> torch.Tensor:
         """
         :param X: (N, L)
         :param Y: (N, L)
-        :param M: (N, L, L) - attention mask
         :return: H_all_y: (N, L, H)
         """
 
@@ -54,17 +53,23 @@ class Transformer(torch.nn.Module):
 
         # 잠깐만... M이 필요한가 -> 필요하긴하넹.
         # (N, L, E), (N, L, H), (N, L, L) -> (N, L, H)
-        H_all_y = self.decoder.forward(decoder_input, H_all_x, self.mask)
+        H_all_y = self.decoder.forward(decoder_input, H_all_x)
 
         return H_all_y
 
-    def predict(self, H_all_y: torch.Tensor) -> torch.Tensor:
+    def predict(self, X: torch.Tensor, y: torch.Tensor) -> torch.Tensor:
         """
-        :param H_all_y: (N, L, H)
+        :param y:
+        :param X: (N, L, H)
         :return: S (N, L, |V|)
         """
+        H_y = self.forward(X, y)  # (N, L, H)
+        W_ = self.token_embeddings.weight  # (|V|, H)
+        Logits = torch.einsum("nlh,vh->nlv", H_y, W_hy)  # (N, L, |V|)
+        Y_hat = torch.softmax(Logits, dim=1)
+        return Y_hat
         # S = torch.bmm(H_all_y, self.token_embeddings.weight.T.expand(N, V, H))
-        S = torch.einsum("nlh,vh->nlv", H_all_y, self.token_embeddings.weight)  # (N, L, H) * (|V|, E=H) -> (N, L, |V|)
+        S = torch.einsum("nlh,vh->nlv", X, self.token_embeddings.weight)  # (N, L, H) * (|V|, E=H) -> (N, L, |V|)
 
     def training_step(self, X: torch.Tensor, Y: torch.Tensor, M: torch.Tensor) -> torch.Tensor:
         """

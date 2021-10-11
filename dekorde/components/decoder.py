@@ -1,3 +1,5 @@
+from typing import Tuple
+
 import torch
 import torch.nn as nn
 from dekorde.components.mha import MultiHeadAttentionLayer
@@ -15,12 +17,12 @@ class DecoderLayer(torch.nn.Module):
         # masked
         self.multi_head_self_attn = MultiHeadAttentionLayer(d_model=d_model,
                                                             head_size=head_size,
-                                                            is_masked=False)
+                                                            is_masked=True)
         self.norm_for_self_attn = torch.nn.LayerNorm(d_model)
         # not masked
         self.multi_head_enc_dec_attn = MultiHeadAttentionLayer(d_model=d_model,
                                                                head_size=head_size,
-                                                               is_masked=True)
+                                                               is_masked=False)
         self.norm_for_enc_dec_attn = torch.nn.LayerNorm(d_model)
         self.ffn = nn.Sequential(
             nn.Linear(d_model, self.ffn_inner_dim),
@@ -29,13 +31,13 @@ class DecoderLayer(torch.nn.Module):
         )
         self.norm_for_ffn = torch.nn.LayerNorm(d_model)
 
-    def forward(self, H_y: torch.Tensor, H_x_out: torch.Tensor, M) -> torch.Tensor:
+    def forward(self,
+                H: Tuple[torch.Tensor, torch.Tensor]) -> Tuple[torch.Tensor, torch.Tensor]:
         """
-        :param H_y: (N, L, E)
-        :param H_x_out: (N, L, H)
-        :param M: (???)
+        :param H: ( (N, L, E), (N, L, H) )
         :return: H_all_t: (N, L, H)
         """
+        H_y, H_x_out = H
         self_mha_out = self.multi_head_self_attn.forward(H_q=H_y, H_k=H_y, H_v=H_y, M=self.mask)
         self_mha_layer_out = self.norm_for_self_attn(self_mha_out + H_y)
 
@@ -47,7 +49,7 @@ class DecoderLayer(torch.nn.Module):
         ffn_out = self.ffn(dec_enc_attn_layer_out)
         ffn_layer_out = self.norm_for_ffn(ffn_out + dec_enc_attn_layer_out)
 
-        return ffn_layer_out
+        return H_x_out, ffn_layer_out
 
 
 class Decoder(torch.nn.Module):
@@ -58,11 +60,14 @@ class Decoder(torch.nn.Module):
             *[DecoderLayer(d_model, head_size, mask) for _ in range(depth)]
         )
 
-    def forward(self, H_y: torch.Tensor, H_all_x: torch.Tensor, mask: torch.Tensor) -> torch.Tensor:
+    def forward(self,
+                H_y: torch.Tensor,
+                H_x_out: torch.Tensor) -> torch.Tensor:
         """
         :param H_y: (N, L, E)
-        :param H_all_x: (N, L, H)
-        :param mask: (???)
+        :param H_x_out: (N, L, H)
         :return: H_all_t: (N, L, H)
         """
-        return self.decoder_layers(H_y, H_all_x, mask)
+        _, out = self.decoder_layers((H_y, H_x_out))
+
+        return out

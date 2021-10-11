@@ -30,15 +30,17 @@ def build_I(sents: List[str],
 
 
 def build_M(sents: List[str],
+            head_size: int,
             max_sentence_length: int,
             device: torch.device) -> torch.Tensor:
     """
     how to mask
+    :param head_size:
     :param sents:
     :param max_sentence_length:
     :param device:
     :return: M (N, L, L)  - 3차원?
     """
 
-    M = torch.tril(torch.ones(max_sentence_length, max_sentence_length)).repeat(len(sents), 1, 1)
+    M = torch.tril(torch.ones(head_size, head_size)).repeat(len(sents), max_sentence_length, 1, 1)
     return M.to(device)

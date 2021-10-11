@@ -15,7 +15,7 @@ def main():
         'h',
     ]
     L = 10
-    M = build_M(sents, L, device)
+    M = build_M(sents, L, 8, device)
     print(M)
 
 

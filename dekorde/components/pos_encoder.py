@@ -8,7 +8,7 @@ class PositionalEncoding(nn.Module):
                  d_model: int,
                  dropout_rate: int = 0,
                  max_len: int = 5000):
-        super(PositionalEncoding).__init__()
+        super(PositionalEncoding, self).__init__()
 
         # base dropout rate is set as 0. => fully wired.
         self.dropout = nn.Dropout(p=dropout_rate)

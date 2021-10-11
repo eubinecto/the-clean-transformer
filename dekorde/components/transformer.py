@@ -24,7 +24,7 @@ class Transformer(torch.nn.Module):
         # any layers to optimise?
         # TODO - determine the number of embeddings
         self.token_embeddings = torch.nn.Embedding(num_embeddings=vocab_size, embedding_dim=d_model)
-        self.pos_encodings = PositionalEncoding(d_model=d_model, max_len=max_length)
+        self.pos_encodings = PositionalEncoding(d_model=d_model, max_len=max_length, device=d)
         self.encoder = Encoder(d_model, head_size, depth)  # the encoder stack
         self.decoder = Decoder(d_model, head_size, mask, depth)  # the decoder stack
 

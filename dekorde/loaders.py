@@ -5,7 +5,7 @@ import json
 import csv
 
 
-def load_gibberish2kor() -> List[Tuple[str, str]]:
+def load_gib2kor() -> List[Tuple[str, str]]:
     with open(GIBBERISH2KOR_TSV, 'r') as fh:
         tsv_reader = csv.reader(fh, delimiter="\t")
         next(tsv_reader)  # skip the header

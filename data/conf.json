@@ -1,9 +1,8 @@
 {
-  "hidden_size": 512,
-  "embed_size": 512,
+  "hidden_size": 64,
   "heads": 8,
-  "depth": 10,
-  "epochs": 100,
+  "depth": 3,
+  "epochs": 150,
   "max_length": 30,
   "lr": 0.0001
 }

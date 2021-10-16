@@ -4,10 +4,9 @@ from dekorde.builders import build_I, build_M
 from keras_preprocessing.text import Tokenizer
 import torch
 import wandb
-import argparse
 
 
-def train():
+def train(config=None):
     # ========== loading conf ========== #
     conf = wandb.config
     device = load_device()
@@ -22,7 +21,7 @@ def train():
     run = wandb.init(
         project="dekorde",
         entity="artemisdicotiar",
-        config=conf
+        config=config
     )
 
     # ========== loading data ========== #
@@ -118,7 +117,7 @@ def main():
 
         }
     }
-    sweep_id = wandb.sweep(sweep_config)
+    sweep_id = wandb.sweep(sweep_config, project='dekorde', entity='artemisdicotiar')
     count = 6  # number of runs to execute
 
     wandb.agent(sweep_id, function=train, count=count)

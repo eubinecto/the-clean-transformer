@@ -7,30 +7,22 @@ import wandb
 import argparse
 
 
-def main():
-    conf = load_conf()
-
+def train():
     # ========== loading conf ========== #
+    conf = wandb.config
     device = load_device()
-    d_model = conf.embed_size
-    head_size = conf.heads
+
+    d_model = conf.d_model
+    head_size = conf.head_size
     depth = conf.depth
     epochs = conf.epochs
     max_length = conf.max_length
     lr = conf.lr
 
-    # ========== wandb =========== #
-    wandb_config = {
-        'd_model': d_model,
-        'head_size': head_size,
-        'depth': depth,
-        'epochs': epochs,
-        'max_length': max_length,
-    }
     run = wandb.init(
         project="dekorde",
         entity="artemisdicotiar",
-        config=wandb_config
+        config=conf
     )
 
     # ========== loading data ========== #
@@ -75,7 +67,7 @@ def main():
     model_artifact = wandb.Artifact(
         "trained-dekorder", type="model",
         description="dekorder, korean review translator",
-        metadata=wandb_config
+        metadata=conf
     )
 
     torch.save(transformer.state_dict(), 'dekorder')
@@ -86,6 +78,50 @@ def main():
 
     run.finish()
     wandb.finish()
+
+
+def main():
+    # ========== wandb =========== #
+    sweep_config = {
+        "name": "dekorde-sweep",
+        "method": "bayes",
+        "metric": {
+            "goal": "maximize",
+            "name": "acc"
+        },
+        "parameters": {
+            "max_length": {
+                "min": 60,
+                "max": 15,
+                "distribution": 'int_uniform',
+            },
+            "head_size": {
+                "min": 16,
+                "max": 4,
+                "distribution": 'int_uniform',
+            },
+            "d_model": {
+                "min": 128,
+                "max": 32,
+                "distribution": 'int_uniform',
+            },
+            "epochs": {
+                "min": 300,
+                "max": 75,
+                "distribution": 'int_uniform',
+            },
+            "depth": {
+                "min": 6,
+                "max": 2,
+                "distribution": 'int_uniform',
+            }
+
+        }
+    }
+    sweep_id = wandb.sweep(sweep_config)
+    count = 6  # number of runs to execute
+
+    wandb.agent(sweep_id, function=train, count=count)
 
 
 if __name__ == '__main__':

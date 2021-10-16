@@ -1,4 +1,5 @@
-from typing import Tuple
+from functools import reduce
+from typing import Tuple, List
 
 import torch
 import torch.nn.functional as F
@@ -85,7 +86,7 @@ class Transformer(torch.nn.Module):
 
         return logits, probs, preds
 
-    def training_step(self, X: torch.Tensor, y: torch.Tensor) -> torch.Tensor:
+    def training_step(self, X: torch.Tensor, y: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor]:
         """
         :param X: (N, L) - source
         :param y: (N, L) - target
@@ -96,5 +97,8 @@ class Transformer(torch.nn.Module):
 
         loss = F.cross_entropy(logits, y)
         loss = loss.sum()
-        return loss
+
+        acc = (preds == y).float().sum() / reduce(lambda i, j: i*j, y.size())
+
+        return loss, acc
 

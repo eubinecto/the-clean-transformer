@@ -68,14 +68,16 @@ def main():
     sweep_config = {
         "name": "dekorde-sweep",
         "program": train,
-        "method": "bayes",
+        "method": "grid",
         "metric": {
             "goal": "maximize",
             "name": "acc"
         },
         "parameters": {
             "max_length": {
-                "value": 30,
+                "max": 40,
+                "min": 20,
+                "distribution": 'int_uniform',
             },
             "head_size": {
                 "max": 10,
@@ -83,14 +85,14 @@ def main():
                 "distribution": 'int_uniform',
             },
             "d_model": {
-                "value": 64
+                "values": [32, 64, 128, 256]
             },
             "epochs": {
                 "value": 300,
             },
             "depth": {
                 "max": 8,
-                "min": 3,
+                "min": 2,
                 "distribution": 'int_uniform',
             },
             "lr": {

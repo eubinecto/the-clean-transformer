@@ -68,7 +68,7 @@ def main():
     sweep_config = {
         "name": "dekorde-sweep",
         "program": train,
-        "method": "grid",
+        "method": "bayes",
         "metric": {
             "goal": "maximize",
             "name": "acc"

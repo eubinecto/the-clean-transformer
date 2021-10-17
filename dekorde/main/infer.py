@@ -1,8 +1,63 @@
+from dekorde.components.transformer import Transformer
+from dekorde.loaders import load_conf, load_device, load_gibberish2kor
+from dekorde.builders import build_I, build_M
+from keras_preprocessing.text import Tokenizer
+import torch
+import wandb
+import argparse
 
 
-def main():
-    pass
+def infer():
+    conf = load_conf()
+
+    # ========== loading conf ========== #
+    device = load_device()
+    d_model = conf.embed_size
+    head_size = conf.heads
+    depth = conf.depth
+    epochs = conf.epochs
+    max_length = conf.max_length
+    lr = conf.lr
+
+    # ========== wandb =========== #
+    run = wandb.init(
+        project="dekorde",
+        entity="artemisdicotiar",
+    )
+
+    # ========== loading data ========== #
+    gibberish2kor = load_gibberish2kor()
+
+    gibs = [row[0] for row in gibberish2kor]
+    kors = [row[1] for row in gibberish2kor]
+
+    # ========== setting tokenizer ========== #
+    tokenizer = Tokenizer(char_level=True)
+    tokenizer.fit_on_texts(texts=gibs + kors)
+    vocab_size = len(tokenizer.word_index.keys())
+
+    # ========== converting raw text to tensor ========== #
+    X = build_I(gibs, tokenizer, max_length, device)  # (N, L)
+
+    M = build_M(kors, head_size, max_length, device)  # (N, L, L)
+
+    # ========== loading model & opts ========== #
+    transformer = Transformer(
+        d_model=d_model,
+        vocab_size=vocab_size,
+        max_length=max_length,
+        head_size=head_size,
+        depth=depth,
+        mask=M
+    ).to(device=device)
+
+    artifact = run.use_artifact('artemisdicotiar/dekorde/trained-dekorder:v2', type='model')
+    dl_dir = artifact.download()
+
+    transformer.load_state_dict(torch.load(f'{dl_dir}/dekorder'))
+
+    transformer.forward()
 
 
 if __name__ == '__main__':
-    main()
+    infer()

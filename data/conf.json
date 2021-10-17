@@ -1,7 +1,7 @@
 {
   "embed_size": 64,
   "heads": 8,
-  "depth": 3,
+  "depth": 4,
   "epochs": 150,
   "max_length": 30,
   "lr": 0.0001

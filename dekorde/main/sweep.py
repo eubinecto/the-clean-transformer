@@ -78,19 +78,19 @@ def main():
                 "value": 30,
             },
             "head_size": {
-                "value": 8,
+                "max": 10,
+                "min": 4,
+                "distribution": 'int_uniform',
             },
             "d_model": {
                 "value": 64
             },
             "epochs": {
-                "max": 200,
-                "min": 100,
-                "distribution": 'int_uniform',
+                "value": 300,
             },
             "depth": {
-                "max": 6,
-                "min": 2,
+                "max": 8,
+                "min": 3,
                 "distribution": 'int_uniform',
             },
             "lr": {

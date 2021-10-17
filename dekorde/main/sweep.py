@@ -6,83 +6,68 @@ import torch
 import wandb
 
 
-def train(config=None):
-    # ========== loading conf ========== #
-    conf = wandb.config
-    device = load_device()
+def train():
+    with wandb.init(
+            project="dekorde",
+            entity="artemisdicotiar",
+    ) as run:
 
-    d_model = conf['d_model']
-    head_size = conf['head_size']
-    depth = conf['depth']
-    epochs = conf['epochs']
-    max_length = conf['max_length']
-    lr = conf['lr']
+        # ========== loading conf ========== #
+        conf = wandb.config
+        device = load_device()
 
-    run = wandb.init(
-        project="dekorde",
-        entity="artemisdicotiar",
-        config=config
-    )
+        d_model = conf['d_model']
+        head_size = conf['head_size']
+        depth = conf['depth']
+        epochs = conf['epochs']
+        max_length = conf['max_length']
+        lr = conf['lr']
 
-    # ========== loading data ========== #
-    gibberish2kor = load_gibberish2kor()
+        # ========== loading data ========== #
+        gibberish2kor = load_gibberish2kor()
 
-    gibs = [row[0] for row in gibberish2kor]
-    kors = [row[1] for row in gibberish2kor]
+        gibs = [row[0] for row in gibberish2kor]
+        kors = [row[1] for row in gibberish2kor]
 
-    # ========== setting tokenizer ========== #
-    tokenizer = Tokenizer(char_level=True)
-    tokenizer.fit_on_texts(texts=gibs + kors)
-    vocab_size = len(tokenizer.word_index.keys())
+        # ========== setting tokenizer ========== #
+        tokenizer = Tokenizer(char_level=True)
+        tokenizer.fit_on_texts(texts=gibs + kors)
+        vocab_size = len(tokenizer.word_index.keys())
 
-    # ========== converting raw text to tensor ========== #
-    X = build_I(gibs, tokenizer, max_length, device)  # (N, L)
-    Y = build_I(kors, tokenizer, max_length, device)  # (N, L)
+        # ========== converting raw text to tensor ========== #
+        X = build_I(gibs, tokenizer, max_length, device)  # (N, L)
+        Y = build_I(kors, tokenizer, max_length, device)  # (N, L)
 
-    M = build_M(kors, head_size, max_length, device)  # (N, L, L)
+        M = build_M(kors, head_size, max_length, device)  # (N, L, L)
 
-    # ========== loading model & opts ========== #
-    transformer = Transformer(
-        d_model=d_model,
-        vocab_size=vocab_size,
-        max_length=max_length,
-        head_size=head_size,
-        depth=depth,
-        mask=M
-    ).to(device=device)
-    optimizer = torch.optim.Adam(params=transformer.parameters(), lr=lr)
+        # ========== loading model & opts ========== #
+        transformer = Transformer(
+            d_model=d_model,
+            vocab_size=vocab_size,
+            max_length=max_length,
+            head_size=head_size,
+            depth=depth,
+            mask=M
+        ).to(device=device)
+        optimizer = torch.optim.Adam(params=transformer.parameters(), lr=lr)
 
-    print('START')
-    # wandb.watch(transformer, log_freq=5)
-    for epoch in range(epochs):
-        loss, acc = transformer.training_step(X, Y)
-        loss.backward()
-        optimizer.step()
-        optimizer.zero_grad()
-        print(f"epoch:{epoch}, loss:{loss}, acc: {acc}")
+        print('START')
+        # wandb.watch(transformer, log_freq=5)
+        for epoch in range(epochs):
+            loss, acc = transformer.training_step(X, Y)
+            loss.backward()
+            optimizer.step()
+            optimizer.zero_grad()
+            print(f"epoch:{epoch}, loss:{loss}, acc: {acc}")
 
-        wandb.log({'loss': loss, 'acc': acc})
-
-    model_artifact = wandb.Artifact(
-        "trained-dekorder", type="model",
-        description="dekorder, korean review translator",
-        metadata=conf
-    )
-
-    # torch.save(transformer.state_dict(), 'dekorder')
-    # model_artifact.add_file("dekorder")
-    # wandb.save("dekorder")
-    #
-    # run.log_artifact(model_artifact)
-
-    run.finish()
-    wandb.finish()
+            wandb.log({'loss': loss, 'acc': acc})
 
 
 def main():
     # ========== wandb =========== #
     sweep_config = {
         "name": "dekorde-sweep",
+        "program": train,
         "method": "bayes",
         "metric": {
             "goal": "maximize",
@@ -90,9 +75,7 @@ def main():
         },
         "parameters": {
             "max_length": {
-                "max": 60,
-                "min": 15,
-                "distribution": 'int_uniform',
+                "value": 30,
             },
             "head_size": {
                 "max": 16,
@@ -100,9 +83,7 @@ def main():
                 "distribution": 'int_uniform',
             },
             "d_model": {
-                "max": 128,
-                "min": 32,
-                "distribution": 'int_uniform',
+                "value": 64
             },
             "epochs": {
                 "max": 300,
@@ -113,14 +94,16 @@ def main():
                 "max": 6,
                 "min": 2,
                 "distribution": 'int_uniform',
+            },
+            "lr": {
+                "value": 0.0001
             }
-
         }
     }
-    sweep_id = wandb.sweep(sweep_config, project='dekorde', entity='artemisdicotiar')
-    count = 6  # number of runs to execute
+    sweep = wandb.sweep(sweep_config, project='dekorde', entity='artemisdicotiar')
+    count = 4  # number of runs to execute
 
-    wandb.agent(sweep_id, function=train, count=count)
+    wandb.agent(sweep, function=train, count=count)
 
 
 if __name__ == '__main__':

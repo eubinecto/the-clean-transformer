@@ -78,16 +78,14 @@ def main():
                 "value": 30,
             },
             "head_size": {
-                "max": 16,
-                "min": 4,
-                "distribution": 'int_uniform',
+                "value": 8,
             },
             "d_model": {
                 "value": 64
             },
             "epochs": {
-                "max": 300,
-                "min": 75,
+                "max": 200,
+                "min": 100,
                 "distribution": 'int_uniform',
             },
             "depth": {
@@ -101,7 +99,7 @@ def main():
         }
     }
     sweep = wandb.sweep(sweep_config, project='dekorde', entity='artemisdicotiar')
-    count = 4  # number of runs to execute
+    count = 6  # number of runs to execute
 
     wandb.agent(sweep, function=train, count=count)
 

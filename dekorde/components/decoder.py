@@ -37,6 +37,7 @@ class DecoderLayer(torch.nn.Module):
         :param H: ( (N, L, E), (N, L, H) )
         :return: H_all_t: (N, L, H)
         """
+        # 두개로 나가야하는 이유
         H_y, H_x_out = H
         self_mha_out = self.multi_head_self_attn.forward(H_q=H_y, H_k=H_y, H_v=H_y, M=self.mask)
         self_mha_layer_out = self.norm_for_self_attn(self_mha_out + H_y)
@@ -57,6 +58,10 @@ class Decoder(torch.nn.Module):
     def __init__(self, d_model: int, head_size: int, mask: torch.Tensor, depth: int):
         super().__init__()
         self.decoder_layers = torch.nn.Sequential(
+            # 입력도 출력도 무조건 하나로.
+            # 여러개 넘기려면 tuple로
+            # layer가 계속 두개로 받기 때문에 두개로 내보내야지...
+
             *[DecoderLayer(d_model, head_size, mask) for _ in range(depth)]
         )
 

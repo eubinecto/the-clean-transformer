@@ -11,12 +11,12 @@ def train(config=None):
     conf = wandb.config
     device = load_device()
 
-    d_model = conf.d_model
-    head_size = conf.head_size
-    depth = conf.depth
-    epochs = conf.epochs
-    max_length = conf.max_length
-    lr = conf.lr
+    d_model = conf['d_model']
+    head_size = conf['head_size']
+    depth = conf['depth']
+    epochs = conf['epochs']
+    max_length = conf['max_length']
+    lr = conf['lr']
 
     run = wandb.init(
         project="dekorde",
@@ -69,11 +69,11 @@ def train(config=None):
         metadata=conf
     )
 
-    torch.save(transformer.state_dict(), 'dekorder')
-    model_artifact.add_file("dekorder")
-    wandb.save("dekorder")
-
-    run.log_artifact(model_artifact)
+    # torch.save(transformer.state_dict(), 'dekorder')
+    # model_artifact.add_file("dekorder")
+    # wandb.save("dekorder")
+    #
+    # run.log_artifact(model_artifact)
 
     run.finish()
     wandb.finish()
@@ -90,28 +90,28 @@ def main():
         },
         "parameters": {
             "max_length": {
-                "min": 60,
-                "max": 15,
+                "max": 60,
+                "min": 15,
                 "distribution": 'int_uniform',
             },
             "head_size": {
-                "min": 16,
-                "max": 4,
+                "max": 16,
+                "min": 4,
                 "distribution": 'int_uniform',
             },
             "d_model": {
-                "min": 128,
-                "max": 32,
+                "max": 128,
+                "min": 32,
                 "distribution": 'int_uniform',
             },
             "epochs": {
-                "min": 300,
-                "max": 75,
+                "max": 300,
+                "min": 75,
                 "distribution": 'int_uniform',
             },
             "depth": {
-                "min": 6,
-                "max": 2,
+                "max": 6,
+                "min": 2,
                 "distribution": 'int_uniform',
             }
 

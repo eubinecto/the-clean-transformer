@@ -29,6 +29,16 @@ def build_I(sents: List[str],
     ).to(device)
 
 
+def build_X(gibs: List[str], tokenizer: Tokenizer, max_length: int, device: torch.device) -> torch.LongTensor:
+    return build_I(gibs, tokenizer, max_length, device).long()
+
+
+def build_Y(kors: List[str], tokenizer: Tokenizer, max_length: int, device: torch.device) -> torch.LongTensor:
+    Y_l = build_I(["s" + kor[:-1] for kor in kors], tokenizer, max_length, device)
+    Y_r = build_I(kors, tokenizer, max_length, device)
+    return torch.stack([Y_l, Y_r], dim=1).long()
+
+
 def build_M(sents: List[str],
             head_size: int,
             max_sentence_length: int,

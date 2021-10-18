@@ -1,6 +1,6 @@
 from dekorde.components.transformer import Transformer
 from dekorde.loaders import load_conf, load_device, load_gibberish2kor
-from dekorde.builders import build_I, build_M
+from dekorde.builders import build_I, build_M, build_X, build_Y
 from keras_preprocessing.text import Tokenizer
 import torch
 import wandb
@@ -45,8 +45,8 @@ def main():
     vocab_size = len(tokenizer.word_index.keys())
 
     # ========== converting raw text to tensor ========== #
-    X = build_I(gibs, tokenizer, max_length, device)  # (N, L)
-    Y = build_I(kors, tokenizer, max_length, device)  # (N, L)
+    X = build_X(gibs, tokenizer, max_length, device)  # (N, L)
+    Y = build_Y(kors, tokenizer, max_length, device)  # (N, L)
 
     M = build_M(kors, head_size, max_length, device)  # (N, L, L)
 

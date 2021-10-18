@@ -22,10 +22,12 @@ class Transformer(torch.nn.Module):
         self.head_size = head_size
         self.depth = depth
         self.mask = mask
+        self.max_length = max_length
         # any layers to optimise?
         # TODO - determine the number of embeddings
         self.token_embeddings = torch.nn.Embedding(num_embeddings=vocab_size, embedding_dim=d_model)
-        self.pos_encodings = PositionalEncoding(d_model=d_model, max_len=max_length)
+        # self.pos_encodings = PositionalEncoding(d_model=d_model, max_len=max_length)
+        self.pos_embeddings = torch.nn.Embedding(num_embeddings=max_length, embedding_dim=d_model)
         self.encoder = Encoder(d_model, head_size, depth)  # the encoder stack
         self.decoder = Decoder(d_model, head_size, mask, depth)  # the decoder stack
 
@@ -35,26 +37,31 @@ class Transformer(torch.nn.Module):
         :param Y: (N, L)
         :return: H_all_y: (N, L, H)
         """
+        N = X.shape[0]
+        pos_indices = torch.arange(self.max_length).expand(N, self.max_length)
 
         # ============ ENCODER ============ #
-        # input embedding 구하기
-        X_e = self.token_embeddings(X)
+        # # input embedding 구하기
+        # X_e = self.token_embeddings(X)
+        #
+        # # positional encoding 구하기
+        # # + encoder input 구하기
+        # # 이걸하려면 임베딩된 벡터가 있어야 할 것 같아서 X_e를 들고온다.
+        # encoder_input = self.pos_encodings(X_e)
 
-        # positional encoding 구하기
-        # + encoder input 구하기
-        # 이걸하려면 임베딩된 벡터가 있어야 할 것 같아서 X_e를 들고온다.
-        encoder_input = self.pos_encodings(X_e)
+        encoder_input = self.token_embeddings(X) + self.pos_embeddings(pos_indices)  # positional encoding
 
         # encoder stack output (hidden vector)
         H_all_x = self.encoder.forward(encoder_input)  # (N, L) -> (N, L, H)
 
         # ============ DECODER ============ #
         # output embedding 구하기 (shifted right)
-        Y_e = self.token_embeddings(Y)
-
-        # positional encoding 구하기
-        # + decoder input
-        decoder_input = self.pos_encodings(Y_e)
+        # Y_e = self.token_embeddings(Y)
+        #
+        # # positional encoding 구하기
+        # # + decoder input
+        # decoder_input = self.pos_encodings(Y_e)
+        decoder_input = self.token_embeddings(Y) + self.pos_embeddings(pos_indices)  # positional encoding
 
         # 잠깐만... M이 필요한가 -> 필요하긴하넹.
         # (N, L, E), (N, L, H), (N, L, L) -> (N, L, H)
@@ -92,13 +99,15 @@ class Transformer(torch.nn.Module):
         :param y: (N, L) - target
         :return: loss (1,)
         """
-        logits, probs, preds = self.predict(X, y)
+        y_l = y[:, 0]  # starts from "s", ends just before the last character.
+        y_r = y[:, 1]  # starts after "s", ends with the last character.
+        logits, probs, preds = self.predict(X, y_l)
         logits = torch.einsum('nlv->nvl', logits)
 
-        loss = F.cross_entropy(logits, y)
+        loss = F.cross_entropy(logits, y_r)
         loss = loss.sum()
 
-        acc = (preds == y).float().sum() / reduce(lambda i, j: i*j, y.size())
+        acc = (preds == y_r).float().sum() / reduce(lambda i, j: i*j, y.size())
 
         return loss, acc
 

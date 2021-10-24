@@ -1,5 +1,5 @@
 from dekorde.components.transformer import Transformer
-from dekorde.loaders import load_conf, load_device, load_gib2kor
+from dekorde.loaders import load_conf, load_device, load_seoul2jeju
 from dekorde.builders import build_X, build_Y, build_lookahead_mask
 from keras_preprocessing.text import Tokenizer
 import torch
@@ -16,7 +16,7 @@ def main():
     lr = conf['lr']
 
     # ---build the data --- #
-    gib2kor = load_gib2kor()
+    gib2kor = load_seoul2jeju()
     gibs = [gib for gib, _ in gib2kor]
     kors = ["s" + kor for _, kor in gib2kor]  # s stands for "start of the sequence"
     tokenizer = Tokenizer(char_level=True)

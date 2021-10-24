@@ -12,6 +12,7 @@ def build_I(sents: List[str], tokenizer: Tokenizer, max_length: int, device: tor
     return torch.LongTensor(seqs).to(device)
 
 
+# --- these are for building the X and Y --- #
 def build_X(gibs: List[str], tokenizer: Tokenizer, max_length: int, device: torch.device) -> torch.LongTensor:
     return build_I(gibs, tokenizer, max_length, device)
 
@@ -20,7 +21,6 @@ def build_Y(kors: List[str], tokenizer: Tokenizer, max_length: int, device: torc
     Y_l = build_I(["s" + kor[:-1] for kor in kors], tokenizer, max_length, device)
     Y_r = build_I(kors, tokenizer, max_length, device)
     return torch.stack([Y_l, Y_r], dim=1).long()
-
 
 
 def build_lookahead_mask(max_length: int, device: torch.device) -> torch.LongTensor:

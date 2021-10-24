@@ -1,14 +1,14 @@
 from typing import List, Tuple
-from dekorde.paths import CONF_JSON,  GIBBERISH2KOR_TSV
+from dekorde.paths import CONF_JSON,  SEOUL2JEJU_TSV
 import torch
 import json
 import csv
 
 
-def load_gib2kor() -> List[Tuple[str, str]]:
-    with open(GIBBERISH2KOR_TSV, 'r') as fh:
+def load_seoul2jeju() -> List[Tuple[str, str]]:
+    with open(SEOUL2JEJU_TSV, 'r') as fh:
         tsv_reader = csv.reader(fh, delimiter="\t")
-        next(tsv_reader)  # skip the header
+        next(tsv_reader)  # skip the header (seoul, jeju)
         return [
             (row[0], row[1])
             for row in tsv_reader

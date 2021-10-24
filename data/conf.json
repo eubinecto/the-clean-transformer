@@ -3,6 +3,7 @@
   "heads": 8,
   "depth": 3,
   "epochs": 150,
-  "max_length": 100,
+  "batch_size": 50,
+  "max_length": 50,
   "lr": 0.0001
 }

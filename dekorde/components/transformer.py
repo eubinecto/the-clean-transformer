@@ -19,21 +19,17 @@ class Transformer(torch.nn.Module):
 
     def forward(self, X: torch.Tensor, Y: torch.Tensor) -> torch.Tensor:
         """
-        :param X: (N, 2, L)
-        :param Y: (N, 2, L)
+        :param X: (N, L)
+        :param Y: (N, L)
         :return H_y: (N, L, H)
         """
         N = X.shape[0]
         pos_indices = torch.arange(self.max_length).expand(N, self.max_length)
         # --- get the embedding vectors --- #
-        X_input_ids = X[: 0]
-        Y_input_ids = Y[: 0]
-        X_embed = self.token_embeddings(X_input_ids) + self.pos_embeddings(pos_indices)  # positional encoding
-        Y_embed = self.token_embeddings(Y_input_ids) + self.pos_embeddings(pos_indices)  # positional encoding
+        pos_embeddings = self.pos_embeddings(pos_indices)
+        X_embed = self.token_embeddings(X) + pos_embeddings  # positional encoding
+        Y_embed = self.token_embeddings(Y) + pos_embeddings  # positional encoding
         # --- get the hidden vectors --- #
-        # TODO: get use the padding masks
-        # X_padding_mask = X[: 1]
-        # Y_padding_mask = Y[: 1]
         H_x = self.encoder(X_embed)  # (N, L, H) -> (N, L, H)
         H_y = self.decoder(H_x, Y_embed)  # (N, L, H) -> (N, L, H)
         return H_y
@@ -41,8 +37,8 @@ class Transformer(torch.nn.Module):
     def training_step(self, X: torch.Tensor, Y: torch.Tensor) -> torch.Tensor:
         """
         A function for computing the loss for this batch.
-        :param X: (N, 2, L) - source
-        :param Y: (N, 2, 2, L) - target
+        :param X: (N, L) - source
+        :param Y: (N, 2, L) - target
         :return: loss (1,)
         """
         Y_l = Y[:, 0]  # starts from "s", ends just before the last character.

@@ -11,23 +11,26 @@ def main():
     device = load_device()
     max_length = conf['max_length']
     hidden_size = conf['hidden_size']
+    batch_size = conf['batch_size']  #  batch processing to be implemented later.
     heads = conf['heads']
     depth = conf['depth']
     lr = conf['lr']
 
     # --- build the data --- #
-    seoul2jeju = load_seoul2jeju()
+    seoul2jeju = load_seoul2jeju()[:10]
     seouls = [seoul for seoul, _ in seoul2jeju]
-    jejus = ["s" + jeju for _, jeju in seoul2jeju]  # s stands for "start of the sequence"
+    jejus = [jeju for _, jeju in seoul2jeju]
 
     # --- load a tokenizer --- #
     tokenizer = BertTokenizer.from_pretrained("beomi/kcbert-base")  # pre-trained on colloquial data
-    X = XBuilder(tokenizer, max_length, device)(seouls)  # (N, 2, L)
-    Y = YBuilder(tokenizer, max_length, device)(jejus)  # (N, 2, 2, L)
+    start_token = "[SOS]"
+    tokenizer.add_tokens("[SOS]")  # add the start-of-sequence token.
+    X = XBuilder(tokenizer, max_length, device)(seouls)  # (N, L)
+    Y = YBuilder(tokenizer, max_length, start_token, device)(jejus)  # (N, 2, L)
     lookahead_mask = build_lookahead_mask(max_length, device)  # (L, L)
 
     # --- instantiate the model and the optimizer --- #
-    transformer = Transformer(hidden_size, tokenizer.vocab_size, max_length, heads, depth, lookahead_mask)
+    transformer = Transformer(hidden_size, len(tokenizer), max_length, heads, depth, lookahead_mask)
     optimizer = torch.optim.Adam(params=transformer.parameters(), lr=lr)
 
     # --- start training --- #
@@ -38,6 +41,8 @@ def main():
         optimizer.step()  # gradient descent
         optimizer.zero_grad()  # prevent the gradients accumulating.
         print(f"epoch:{epoch}, loss:{loss}")
+
+    # you may want to save the model & the tokenizer as well
 
 
 if __name__ == '__main__':

@@ -19,14 +19,21 @@ class Transformer(torch.nn.Module):
 
     def forward(self, X: torch.Tensor, Y: torch.Tensor) -> torch.Tensor:
         """
-        :param X: (N, L)
-        :param Y: (N, L)
+        :param X: (N, 2, L)
+        :param Y: (N, 2, L)
         :return H_y: (N, L, H)
         """
         N = X.shape[0]
         pos_indices = torch.arange(self.max_length).expand(N, self.max_length)
-        X_embed = self.token_embeddings(X) + self.pos_embeddings(pos_indices)  # positional encoding
-        Y_embed = self.token_embeddings(Y) + self.pos_embeddings(pos_indices)  # positional encoding
+        # --- get the embedding vectors --- #
+        X_input_ids = X[: 0]
+        Y_input_ids = Y[: 0]
+        X_embed = self.token_embeddings(X_input_ids) + self.pos_embeddings(pos_indices)  # positional encoding
+        Y_embed = self.token_embeddings(Y_input_ids) + self.pos_embeddings(pos_indices)  # positional encoding
+        # --- get the hidden vectors --- #
+        # TODO: get use the padding masks
+        # X_padding_mask = X[: 1]
+        # Y_padding_mask = Y[: 1]
         H_x = self.encoder(X_embed)  # (N, L, H) -> (N, L, H)
         H_y = self.decoder(H_x, Y_embed)  # (N, L, H) -> (N, L, H)
         return H_y
@@ -34,13 +41,13 @@ class Transformer(torch.nn.Module):
     def training_step(self, X: torch.Tensor, Y: torch.Tensor) -> torch.Tensor:
         """
         A function for computing the loss for this batch.
-        :param X: (N, L) - source
-        :param Y: (N, 2, L) - target. (N, 0, L) = Y_l.  (N, 1, L) = Y_r.
+        :param X: (N, 2, L) - source
+        :param Y: (N, 2, 2, L) - target
         :return: loss (1,)
         """
         Y_l = Y[:, 0]  # starts from "s", ends just before the last character.
         Y_r = Y[:, 1]  # starts after "s", ends with the last character.
-        H_y = self.forward(X, Y_l)  # (N, L, H)
+        H_y = self.forward(X, Y_l)  # ... -> (N, L, H)
         W_hy = self.token_embeddings.weight  # (|V|, H)
         # reduce the matrices over the dimension H.
         # cross entropy of 3D input? - https://stackoverflow.com/a/63650146

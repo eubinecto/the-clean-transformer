@@ -25,12 +25,14 @@ def main():
     tokenizer = BertTokenizer.from_pretrained("beomi/kcbert-base")  # pre-trained on colloquial data
     start_token = "[SOS]"
     tokenizer.add_tokens("[SOS]")  # add the start-of-sequence token.
+    start_token_id = tokenizer.convert_tokens_to_ids(start_token)
     X = XBuilder(tokenizer, max_length, device)(seouls)  # (N, L)
     Y = YBuilder(tokenizer, max_length, start_token, device)(jejus)  # (N, 2, L)
     lookahead_mask = build_lookahead_mask(max_length, device)  # (L, L)
 
     # --- instantiate the model and the optimizer --- #
-    transformer = Transformer(hidden_size, len(tokenizer), max_length, heads, depth, lookahead_mask)
+    transformer = Transformer(hidden_size, len(tokenizer), max_length, heads, depth,
+                              start_token_id, lookahead_mask, device)
     optimizer = torch.optim.Adam(params=transformer.parameters(), lr=lr)
 
     # --- start training --- #
@@ -43,6 +45,8 @@ def main():
         print(f"epoch:{epoch}, loss:{loss}")
 
     # you may want to save the model & the tokenizer as well
+    Y_pred = transformer.infer(X)
+    print(Y_pred)
 
 
 if __name__ == '__main__':

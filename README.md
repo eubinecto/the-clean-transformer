@@ -1,4 +1,4 @@
-# dekorde
+# dekorde (공사중 - 11월 1일에 마무리될 예정)
 트랜스포머 밑바닥부터 구현 -  수업  &amp;  Sesame's Pirates
 
 ## 강의노트

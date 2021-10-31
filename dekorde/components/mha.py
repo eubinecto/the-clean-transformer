@@ -26,12 +26,12 @@ class MultiHeadAttentionLayer(torch.nn.Module):
         self.W_o = torch.nn.Linear(hidden_size, hidden_size)  # for aggregating the multi-head outputs.
 
     def forward(self, H_q: torch.Tensor, H_k: torch.Tensor, H_v: torch.Tensor,
-                padding_mask: torch.Tensor) -> torch.Tensor:
+                mask: torch.Tensor) -> torch.Tensor:
         """
         :param H_q: (N, L, H)
         :param H_k: (N, L, H)
         :param H_v: (N, L, H)
-        :param padding_mask (N, L)
+        :param mask (N, L)
         :return: H_all (N, L, H)
         """
         # build Query, Key and Value
@@ -48,7 +48,7 @@ class MultiHeadAttentionLayer(torch.nn.Module):
         K = K.reshape(N, self.heads, self.max_length, self.hidden_size // self.heads)
         V = V.reshape(N, self.heads, self.max_length, self.hidden_size // self.heads)
         # compute the scaled dot product attention
-        concats = self.scaled_dot_product_attention(Q, K, V, padding_mask)  # ... -> (N, L, H)
+        concats = self.scaled_dot_product_attention(Q, K, V, mask)  # ... -> (N, L, H)
         H_all = self.W_o(concats)  # (N, L, H) * (H, H) -> (N, L, H)
         return H_all
 
@@ -56,7 +56,7 @@ class MultiHeadAttentionLayer(torch.nn.Module):
                                      Q: torch.Tensor,
                                      K: torch.Tensor,
                                      V: torch.Tensor,
-                                     padding_mask: torch.Tensor) -> torch.Tensor:
+                                     mask: torch.Tensor) -> torch.Tensor:
         """
          # --- einsum symbols --- #
          a = N
@@ -66,7 +66,7 @@ class MultiHeadAttentionLayer(torch.nn.Module):
         :param Q: (N, heads, L, H // heads)
         :param K: (N, heads, L, H // heads)
         :param V: (N, heads, L, H // heads)
-        :param padding_mask (N, L)
+        :param mask (N, L)
         :return: concats (N, L, H)
         """
         N = Q.shape[0]
@@ -79,7 +79,7 @@ class MultiHeadAttentionLayer(torch.nn.Module):
         # that is, we reduce the matrices over the "d" dimension
         sims = torch.einsum("abic,abjc->abij", Q, K)
         # mask the sims with the padding mask
-        sims = self.mask_sims(sims, mask=padding_mask)
+        sims = self.mask_sims(sims, mask=mask)
         # then normalise the sims to get the attention scores
         attentions = torch.softmax(sims, dim=2)  # (N, heads, L, L), normalise over L (the first one)
         # (N, heads, L, L) * (N, heads, L,  H // heads) -> (N, heads, L, H // heads)
@@ -96,7 +96,13 @@ class MultiHeadAttentionLayer(torch.nn.Module):
         :param mask: (N, L) if padding_mask, or  (L, L) if lookahead mask
         :return:
         """
-        sims = sims.masked_fill(mask.expand(sims.shape) == 0, float("-inf"))
+
+        sims = sims.masked_fill(
+            mask.repeat(
+                list(sims.shape[:2])+[sims.shape[2] // mask.shape[0], sims.shape[3] // mask.shape[1]]
+            ) == 0,
+            float("-inf")
+        )
         return sims
 
 
@@ -106,8 +112,6 @@ class MaskedMultiHeadAttentionLayer(MultiHeadAttentionLayer):
         self.lookahead_mask = lookahead_mask
 
     def mask_sims(self, sims: torch.Tensor, mask: torch.Tensor) -> torch.Tensor:
-        # mask the padded ones
-        sims = super(MaskedMultiHeadAttentionLayer, self).mask_sims(sims, mask)
         # then mask the answers
         sims = super(MaskedMultiHeadAttentionLayer, self).mask_sims(sims, mask=self.lookahead_mask)
         return sims

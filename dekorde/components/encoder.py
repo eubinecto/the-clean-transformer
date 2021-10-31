@@ -20,7 +20,7 @@ class EncoderLayer(torch.nn.Module):
         :return: H_x: (N, L, H)
         """
         H_x, padding_mask = inputs
-        Out_ = self.multi_head_self_attention_layer.forward(H_q=H_x, H_k=H_x, H_v=H_x, padding_mask=padding_mask) + H_x
+        Out_ = self.multi_head_self_attention_layer.forward(H_q=H_x, H_k=H_x, H_v=H_x, mask=padding_mask) + H_x
         Out_ = self.norm_1(Out_)
         Out_ = self.ffn(Out_) + Out_
         Out = self.norm_2(Out_)  # this is the new H_x
@@ -40,5 +40,5 @@ class Encoder(torch.nn.Module):
         :param padding_mask: (N, L)
         :return: H_x: (N, L, H)
         """
-        H_x = self.encoder_layers((X_embed, padding_mask))
+        H_x, _ = self.encoder_layers((X_embed, padding_mask))
         return H_x

@@ -24,9 +24,9 @@ class DecoderLayer(torch.nn.Module):
         :return: H_x (as-is), H_y (updated), padding_mask (as-is)
         """
         H_x, H_y, padding_mask = inputs
-        Out_ = self.masked_mhsa_layer.forward(H_q=H_y, H_k=H_y, H_v=H_y, padding_mask=padding_mask) + H_y
+        Out_ = self.masked_mhsa_layer.forward(H_q=H_y, H_k=H_y, H_v=H_y, mask=padding_mask) + H_y
         Out_ = self.norm_1(Out_)
-        Out_ = self.mheda_layer.forward(H_q=Out_, H_k=H_x, H_v=H_x, padding_mask=padding_mask) + Out_
+        Out_ = self.mheda_layer.forward(H_q=Out_, H_k=H_x, H_v=H_x, mask=padding_mask) + Out_
         Out_ = self.norm_2(Out_)
         Out_ = self.ffn(Out_)
         Out = self.norm_3(Out_)  # H_y updated
@@ -48,5 +48,5 @@ class Decoder(torch.nn.Module):
         :param padding_mask (N, L, H)
         :return: H_y: (N, L, H)
         """
-        _, H_y = self.layers((H_x, Y_embed, padding_mask))
+        _, _, H_y = self.layers((H_x, Y_embed, padding_mask))
         return H_y

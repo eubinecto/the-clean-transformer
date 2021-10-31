@@ -30,15 +30,17 @@ class Transformer(torch.nn.Module):
         """
         N = X.shape[0]
         X_ids = X[:, 0]
+        Y_ids = Y[:, 0]
         padding_mask = X[:, 1]
         pos_indices = torch.arange(self.max_length).expand(N, self.max_length).to(self.device)
         # --- get the embedding vectors --- #
         pos_embed = self.pos_embeddings(pos_indices)
         X_embed = self.token_embeddings(X_ids) + pos_embed  # positional encoding
-        Y_embed = self.token_embeddings(Y) + pos_embed  # positional encoding
+
+        Y_embed = self.token_embeddings(Y_ids) + pos_embed  # positional encoding
         # --- generate the hidden vectors --- #
-        H_x = self.encoder(X_embed)  # (N, L, H) -> (N, L, H)
-        H_y = self.decoder(H_x, Y_embed)  # (N, L, H), (N, L, H) -> (N, L, H)
+        H_x = self.encoder(X_embed, padding_mask)  # (N, L, H) -> (N, L, H)
+        H_y = self.decoder(H_x, Y_embed, padding_mask)  # (N, L, H), (N, L, H) -> (N, L, H)
         return H_y
 
     def training_step(self, X: torch.Tensor, Y: torch.Tensor) -> torch.Tensor:
@@ -70,9 +72,9 @@ class Transformer(torch.nn.Module):
         pos_embed = self.pos_embeddings(pos_indices)
         X_embed = self.token_embeddings(X) + pos_embed
         H_x = self.encoder(X_embed)  # ... -> (N, L, H)
-        # Y = torch.zeros(size=(N, L)).long().to(self.device)
+        Y = torch.zeros(size=(N, L)).long().to(self.device)
         # Y = torch.ones(size=(N, L)).long().to(self.device)  # ones를 넣으면, 1을 정답으로 생각하려나?
-        Y = torch.full(size=(N, L), fill_value=410).to(self.device)  # 긕
+        # Y = torch.full(size=(N, L), fill_value=410).to(self.device)  # 긕
         # Y = torch.full(size=(N, L), fill_value=411)
         Y[:, 0] = self.start_token_id  # (N, L)
         W_hy = self.token_embeddings.weight  # (|V|, H)

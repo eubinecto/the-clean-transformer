@@ -43,12 +43,15 @@ class YBuilder(TensorBuilder):
     def __call__(self, sents: List[str]):
         """
         :param sents:
-        :return: (N, 2, L)
+        :return: (N, 2, 2, L)
         """
         # "[SOS]" stands for  "Start of Sequence".
         encoded_l = self.encode([self.start_token + sent[:-1] for sent in sents])
         encoded_r = self.encode(sents)
-        return torch.stack([encoded_l['input_ids'], encoded_r['input_ids']], dim=1).to(self.device)
+        return torch.stack(
+            [torch.stack([encoded_l['input_ids'], encoded_l['attention_mask']], dim=1).to(self.device),
+             torch.stack([encoded_r['input_ids'], encoded_r['attention_mask']], dim=1).to(self.device)],
+            dim=1).to(self.device)
 
 
 def build_lookahead_mask(max_length: int, device: torch.device) -> torch.LongTensor:

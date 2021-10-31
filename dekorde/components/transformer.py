@@ -24,15 +24,17 @@ class Transformer(torch.nn.Module):
 
     def forward(self, X: torch.Tensor, Y: torch.Tensor) -> torch.Tensor:
         """
-        :param X: (N, L)
+        :param X: (N, 2, L)
         :param Y: (N, L)
         :return H_y: (N, L, H)
         """
         N = X.shape[0]
+        X_ids = X[:, 0]
+        padding_mask = X[:, 1]
         pos_indices = torch.arange(self.max_length).expand(N, self.max_length)
         # --- get the embedding vectors --- #
         pos_embed = self.pos_embeddings(pos_indices)
-        X_embed = self.token_embeddings(X) + pos_embed  # positional encoding
+        X_embed = self.token_embeddings(X_ids) + pos_embed  # positional encoding
         Y_embed = self.token_embeddings(Y) + pos_embed  # positional encoding
         # --- generate the hidden vectors --- #
         H_x = self.encoder(X_embed)  # (N, L, H) -> (N, L, H)
@@ -68,22 +70,18 @@ class Transformer(torch.nn.Module):
         pos_embed = self.pos_embeddings(pos_indices)
         X_embed = self.token_embeddings(X) + pos_embed
         H_x = self.encoder(X_embed)  # ... -> (N, L, H)
-        Y = torch.zeros(size=(N, L)).long().to(self.device)
+        # Y = torch.zeros(size=(N, L)).long().to(self.device)
+        # Y = torch.ones(size=(N, L)).long().to(self.device)  # ones를 넣으면, 1을 정답으로 생각하려나?
+        Y = torch.full(size=(N, L), fill_value=410)  # 긕
+        # Y = torch.full(size=(N, L), fill_value=411)
         Y[:, 0] = self.start_token_id  # (N, L)
         W_hy = self.token_embeddings.weight  # (|V|, H)
 
         for time in range(1, L):
             # what do we do here?
             Y_embed = self.token_embeddings(Y) + pos_embed
-            # lookahead mask
-            # [SOS] 0  0   0 0
-            # [SOS] 24 0   0 0
-            # [SOS] 24 152 0 0
-            # [SOS] 24 152 23 0
-            # padding mask
-            #  1 , 0, 0, 0
             H_y = self.decoder(H_x, Y_embed)  # (N, L, H), (N, L, H) -> (N, L, H)
-            logits = torch.einsum("abc,dc->abd", H_y, W_hy)  # -> (N, L, |V|)
+            logits = torch.einsum("abc,dc->abd", H_y, W_hy)  # (N, L, H) * (|V|, H) -> (N, L, |V|)
             probs = torch.softmax(logits, dim=2)
             indices = torch.argmax(probs, dim=2)
             predicted_token_ids = indices[:, time]  # (N, L) -> (N, 1)

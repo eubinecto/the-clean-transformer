@@ -27,10 +27,11 @@ class XBuilder(TensorBuilder):
     def __call__(self, sents: List[str]) -> torch.Tensor:
         """
         :param sents:
-        :return: (N, L)
+        :return: (N, 2, L)
         """
         encoded = self.encode(sents)
-        return encoded['input_ids'].to(self.device)
+        return torch.stack([encoded['input_ids'],
+                            encoded['attention_mask']], dim=1).to(self.device)
 
 
 class YBuilder(TensorBuilder):

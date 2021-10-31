@@ -47,6 +47,8 @@ def main():
     # you may want to save the model & the tokenizer as well
     Y_pred = transformer.infer(X)
     print(Y_pred)
+    for row in Y_pred.tolist():
+        print(tokenizer.decode(row))
 
 
 if __name__ == '__main__':

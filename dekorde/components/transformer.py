@@ -31,7 +31,7 @@ class Transformer(torch.nn.Module):
         N = X.shape[0]
         X_ids = X[:, 0]
         padding_mask = X[:, 1]
-        pos_indices = torch.arange(self.max_length).expand(N, self.max_length)
+        pos_indices = torch.arange(self.max_length).expand(N, self.max_length).to(self.device)
         # --- get the embedding vectors --- #
         pos_embed = self.pos_embeddings(pos_indices)
         X_embed = self.token_embeddings(X_ids) + pos_embed  # positional encoding
@@ -65,14 +65,14 @@ class Transformer(torch.nn.Module):
         :return Y: (N, L), a batch of input_ids
         """
         N, L = X.shape
-        pos_indices = torch.arange(self.max_length).expand(N, self.max_length)
+        pos_indices = torch.arange(self.max_length).expand(N, self.max_length).to(self.device)
         # --- get the embedding vectors --- #
         pos_embed = self.pos_embeddings(pos_indices)
         X_embed = self.token_embeddings(X) + pos_embed
         H_x = self.encoder(X_embed)  # ... -> (N, L, H)
         # Y = torch.zeros(size=(N, L)).long().to(self.device)
         # Y = torch.ones(size=(N, L)).long().to(self.device)  # ones를 넣으면, 1을 정답으로 생각하려나?
-        Y = torch.full(size=(N, L), fill_value=410)  # 긕
+        Y = torch.full(size=(N, L), fill_value=410).to(self.device)  # 긕
         # Y = torch.full(size=(N, L), fill_value=411)
         Y[:, 0] = self.start_token_id  # (N, L)
         W_hy = self.token_embeddings.weight  # (|V|, H)

@@ -1,6 +1,6 @@
 from dekorde.components.transformer import Transformer
 from dekorde.loaders import load_conf, load_device, load_seoul2jeju
-from dekorde.builders import XBuilder, YBuilder, build_lookahead_mask
+from dekorde.builders import XBuilder, YBuilder, build_mask
 from transformers import BertTokenizer
 import torch
 
@@ -9,6 +9,7 @@ def main():
     conf = load_conf()
     # -- conf; hyper parameters --- #
     device = load_device()
+    print(device)
     max_length = conf['max_length']
     hidden_size = conf['hidden_size']
     batch_size = conf['batch_size']  #  batch processing to be implemented later.
@@ -28,12 +29,13 @@ def main():
     start_token_id = tokenizer.convert_tokens_to_ids(start_token)
     X = XBuilder(tokenizer, max_length, device)(seouls)  # (N, L)
     Y = YBuilder(tokenizer, max_length, start_token, device)(jejus)  # (N, 2, L)
-    lookahead_mask = build_lookahead_mask(max_length, device)  # (L, L)
+    padding_mask = build_mask(X, device, option='padding')
+    lookahead_mask = build_mask(X, device, option='lookahead')  # (L, L)
 
     # --- instantiate the model and the optimizer --- #
     transformer = Transformer(hidden_size, len(tokenizer), max_length, heads, depth,
-                              start_token_id, lookahead_mask, device)
-    optimizer = torch.optim.Adam(params=transformer.parameters(), lr=lr)
+                              start_token_id, padding_mask, lookahead_mask, device)
+    optimizer = torch.optim.AdamW(params=transformer.parameters(), lr=lr)
 
     # --- start training --- #
     for epoch in range(conf['epochs']):
@@ -46,10 +48,9 @@ def main():
 
     # you may want to save the model & the tokenizer as well
     Y_pred = transformer.infer(X)
-    print(Y_pred)
-    for row in Y_pred.tolist():
-        print(tokenizer.decode(row))
-
+    print("="*100)
+    for ids in Y_pred:
+        print(" ".join(tokenizer.convert_ids_to_tokens(ids)), end="\n")
 
 if __name__ == '__main__':
     main()

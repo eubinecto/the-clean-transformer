@@ -7,19 +7,21 @@ from torch.nn import functional as F
 class Transformer(torch.nn.Module):
 
     def __init__(self, hidden_size: int, vocab_size: int,
-                 max_length: int, heads: int, depth: int, start_token_id: int, lookahead_mask: torch.Tensor,
+                 max_length: int, heads: int, depth: int, start_token_id: int, 
+                 padding_mask: torch.Tensor, lookahead_mask: torch.Tensor,
                  device: torch.device):
         super().__init__()
         # --- hyper parameters --- #
         self.max_length = max_length
         self.start_token_id = start_token_id
+        self.padding_mask = padding_mask
         self.lookahead_mask = lookahead_mask
         self.device = device
         # --- layers to optimise --- #
         self.token_embeddings = torch.nn.Embedding(num_embeddings=vocab_size, embedding_dim=hidden_size)
         self.pos_embeddings = torch.nn.Embedding(num_embeddings=max_length, embedding_dim=hidden_size)
         self.encoder = Encoder(hidden_size, max_length, heads, depth)  # the encoder stack
-        self.decoder = Decoder(hidden_size, max_length, heads, depth, lookahead_mask)  # the decoder stack
+        self.decoder = Decoder(hidden_size, max_length, heads, depth)  # the decoder stack
         self.to(device)
 
     def forward(self, X: torch.Tensor, Y: torch.Tensor) -> torch.Tensor:
@@ -30,17 +32,16 @@ class Transformer(torch.nn.Module):
         """
         N = X.shape[0]
         X_ids = X[:, 0]
-        Y_ids = Y[:, 0]
+        Y_ids = Y
         padding_mask = X[:, 1]
         pos_indices = torch.arange(self.max_length).expand(N, self.max_length).to(self.device)
         # --- get the embedding vectors --- #
         pos_embed = self.pos_embeddings(pos_indices)
         X_embed = self.token_embeddings(X_ids) + pos_embed  # positional encoding
-
         Y_embed = self.token_embeddings(Y_ids) + pos_embed  # positional encoding
         # --- generate the hidden vectors --- #
-        H_x = self.encoder(X_embed, padding_mask)  # (N, L, H) -> (N, L, H)
-        H_y = self.decoder(H_x, Y_embed, padding_mask)  # (N, L, H), (N, L, H) -> (N, L, H)
+        H_x = self.encoder(X_embed, self.padding_mask)  # (N, L, H) -> (N, L, H)
+        H_y = self.decoder(H_x, Y_embed, self.padding_mask, self.lookahead_mask)  # (N, L, H), (N, L, H) -> (N, L, H)
         return H_y
 
     def training_step(self, X: torch.Tensor, Y: torch.Tensor) -> torch.Tensor:
@@ -50,8 +51,8 @@ class Transformer(torch.nn.Module):
         :param Y: (N, 2, L) - target
         :return: loss (1,)
         """
-        Y_l = Y[:, 0]  # starts from " [SOS]", ends just before the last character.
-        Y_r = Y[:, 1]  # starts after "[SOS]", ends with the last character.
+        Y_l = Y[:, 0].squeeze()  # starts from " [SOS]", ends just before the last character.
+        Y_r = Y[:, 1].squeeze()  # starts after "[SOS]", ends with the last character.
         H_y = self.forward(X, Y_l)  # ... -> (N, L, H)
         W_hy = self.token_embeddings.weight  # (|V|, H)
         # reduce the matrices over the dimension H.
@@ -66,12 +67,12 @@ class Transformer(torch.nn.Module):
         :param X: (N, L), a batch of input_ids
         :return Y: (N, L), a batch of input_ids
         """
-        N, L = X.shape
+        N, _, L = X.shape
         pos_indices = torch.arange(self.max_length).expand(N, self.max_length).to(self.device)
         # --- get the embedding vectors --- #
         pos_embed = self.pos_embeddings(pos_indices)
-        X_embed = self.token_embeddings(X) + pos_embed
-        H_x = self.encoder(X_embed)  # ... -> (N, L, H)
+        X_embed = self.token_embeddings(X[:, 0]) + pos_embed
+        H_x = self.encoder(X_embed, self.padding_mask)  # ... -> (N, L, H)
         Y = torch.zeros(size=(N, L)).long().to(self.device)
         # Y = torch.ones(size=(N, L)).long().to(self.device)  # ones를 넣으면, 1을 정답으로 생각하려나?
         # Y = torch.full(size=(N, L), fill_value=410).to(self.device)  # 긕
@@ -82,7 +83,7 @@ class Transformer(torch.nn.Module):
         for time in range(1, L):
             # what do we do here?
             Y_embed = self.token_embeddings(Y) + pos_embed
-            H_y = self.decoder(H_x, Y_embed)  # (N, L, H), (N, L, H) -> (N, L, H)
+            H_y = self.decoder(H_x, Y_embed, self.padding_mask, self.lookahead_mask)  # (N, L, H), (N, L, H) -> (N, L, H)
             logits = torch.einsum("abc,dc->abd", H_y, W_hy)  # (N, L, H) * (|V|, H) -> (N, L, |V|)
             probs = torch.softmax(logits, dim=2)
             indices = torch.argmax(probs, dim=2)

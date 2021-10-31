@@ -49,9 +49,24 @@ class YBuilder(TensorBuilder):
         encoded_l = self.encode([self.start_token + sent[:-1] for sent in sents])
         encoded_r = self.encode(sents)
         return torch.stack(
-            [torch.stack([encoded_l['input_ids'], encoded_l['attention_mask']], dim=1).to(self.device),
-             torch.stack([encoded_r['input_ids'], encoded_r['attention_mask']], dim=1).to(self.device)],
+            [torch.stack([encoded_l['input_ids']], dim=1).to(self.device),
+             torch.stack([encoded_r['input_ids']], dim=1).to(self.device)],
             dim=1).to(self.device)
+
+
+def build_mask(X: torch.Tensor, device: torch.device, option: str) -> torch.LongTensor:
+    """
+    build a look-ahead mask.
+    :param X: (N, L)
+    :param device:
+    :return: lookahead_mask (L, L)
+    """
+    if option == 'padding':
+        mask = (X[:, 0] != 0).unsqueeze(1).unsqueeze(2) # (N, L) -> (N, 1, 1, L)
+    if option == 'lookahead':
+        N, _, L = X.shape
+        mask = torch.tril(torch.ones(size=(L, L))).expand(N, 1, L, L) # (L, L) -> (N, 1, L, L)
+    return mask.long().to(device)
 
 
 def build_lookahead_mask(max_length: int, device: torch.device) -> torch.LongTensor:

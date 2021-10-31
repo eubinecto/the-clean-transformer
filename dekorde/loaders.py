@@ -6,7 +6,7 @@ import csv
 
 
 def load_seoul2jeju() -> List[Tuple[str, str]]:
-    with open(SEOUL2JEJU_TSV, 'r') as fh:
+    with open(SEOUL2JEJU_TSV, 'r', encoding='utf-8') as fh:
         tsv_reader = csv.reader(fh, delimiter="\t")
         next(tsv_reader)  # skip the header (seoul, jeju)
         return [

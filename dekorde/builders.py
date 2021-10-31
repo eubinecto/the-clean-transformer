@@ -23,13 +23,16 @@ class TensorBuilder:
 
 
 class XBuilder(TensorBuilder):
+    def __init__(self, tokenizer: BertTokenizer, max_length: int, start_token: str, device: torch.device):
+        self.start_token = start_token
+        super().__init__(tokenizer, max_length, device)
 
     def __call__(self, sents: List[str]) -> torch.Tensor:
         """
         :param sents:
         :return: (N, L)
         """
-        encoded = self.encode(sents)
+        encoded = self.encode([self.start_token + sent for sent in sents])
         return encoded['input_ids'].to(self.device)
 
 

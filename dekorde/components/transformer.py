@@ -1,3 +1,6 @@
+from functools import reduce
+from typing import Tuple
+
 import torch
 from dekorde.components.encoder import Encoder
 from dekorde.components.decoder import Decoder
@@ -39,7 +42,7 @@ class Transformer(torch.nn.Module):
         H_y = self.decoder(H_x, Y_embed)  # (N, L, H), (N, L, H) -> (N, L, H)
         return H_y
 
-    def training_step(self, X: torch.Tensor, Y: torch.Tensor) -> torch.Tensor:
+    def training_step(self, X: torch.Tensor, Y: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor]:
         """
         A function for computing the loss for this batch.
         :param X: (N, L) - source
@@ -55,7 +58,11 @@ class Transformer(torch.nn.Module):
         logits = torch.einsum("abc,dc->adb", H_y, W_hy)  # (N, |V|, L)
         loss = F.cross_entropy(logits, Y_r)  # (N, |V|, L), (N, L) -> (N, 1)
         loss = loss.sum()  # (N, 1) -> (1,)
-        return loss
+
+        probs = torch.softmax(torch.einsum("abc,dc->abd", H_y, W_hy), dim=-1)  # (N, L, |V|)
+        preds = torch.argmax(probs, dim=-1)  # (N, L)
+        acc = (preds == Y_r).float().sum() / reduce(lambda i, j: i * j, Y.size())
+        return loss, acc
 
     def infer(self, X: torch.Tensor) -> torch.Tensor:
         """
@@ -64,10 +71,11 @@ class Transformer(torch.nn.Module):
         """
         N, L = X.shape
         pos_indices = torch.arange(self.max_length).expand(N, self.max_length)
-        # --- get the embedding vectors --- #
+        # # --- get the embedding vectors --- #
         pos_embed = self.pos_embeddings(pos_indices)
         X_embed = self.token_embeddings(X) + pos_embed
         H_x = self.encoder(X_embed)  # ... -> (N, L, H)
+
         Y = torch.zeros(size=(N, L)).long().to(self.device)
         Y[:, 0] = self.start_token_id  # (N, L)
         W_hy = self.token_embeddings.weight  # (|V|, H)
@@ -83,9 +91,13 @@ class Transformer(torch.nn.Module):
             # padding mask
             #  1 , 0, 0, 0
             H_y = self.decoder(H_x, Y_embed)  # (N, L, H), (N, L, H) -> (N, L, H)
+            masking = self.lookahead_mask[time].reshape(L, 1).repeat(N, 1, 30001)
             logits = torch.einsum("abc,dc->abd", H_y, W_hy)  # -> (N, L, |V|)
-            probs = torch.softmax(logits, dim=2)
-            indices = torch.argmax(probs, dim=2)
+
+            # new_logits = logits.masked_fill(masking == 0, float("-inf"))
+
+            probs = torch.softmax(logits, dim=-1)
+            indices = torch.argmax(probs, dim=1)
             predicted_token_ids = indices[:, time]  # (N, L) -> (N, 1)
             Y[:, time] = predicted_token_ids
         return Y

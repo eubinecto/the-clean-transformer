@@ -11,7 +11,7 @@ def main():
     device = load_device()
     max_length = conf['max_length']
     hidden_size = conf['hidden_size']
-    batch_size = conf['batch_size']  #  batch processing to be implemented later.
+    batch_size = conf['batch_size']  # batch processing to be implemented later.
     heads = conf['heads']
     depth = conf['depth']
     lr = conf['lr']
@@ -26,7 +26,7 @@ def main():
     start_token = "[SOS]"
     tokenizer.add_tokens("[SOS]")  # add the start-of-sequence token.
     start_token_id = tokenizer.convert_tokens_to_ids(start_token)
-    X = XBuilder(tokenizer, max_length, device)(seouls)  # (N, L)
+    X = XBuilder(tokenizer, max_length, start_token, device)(seouls)  # (N, L)
     Y = YBuilder(tokenizer, max_length, start_token, device)(jejus)  # (N, 2, L)
     lookahead_mask = build_lookahead_mask(max_length, device)  # (L, L)
 
@@ -38,15 +38,11 @@ def main():
     # --- start training --- #
     for epoch in range(conf['epochs']):
         # compute the loss.
-        loss = transformer.training_step(X, Y)
+        loss, acc = transformer.training_step(X, Y)
         loss.backward()  # backprop
         optimizer.step()  # gradient descent
         optimizer.zero_grad()  # prevent the gradients accumulating.
-        print(f"epoch:{epoch}, loss:{loss}")
-
-    # you may want to save the model & the tokenizer as well
-    Y_pred = transformer.infer(X)
-    print(Y_pred)
+        print(f"epoch:{epoch}, loss:{loss}, acc: {acc}")
 
 
 if __name__ == '__main__':

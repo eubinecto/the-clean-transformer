@@ -10,9 +10,10 @@ import torch
 
 def main():
     parser = argparse.ArgumentParser()
+    parser.add_argument("--ver", type=str, default="overfit")
     parser.add_argument("--num_workers", type=int, default=4)
     args = parser.parse_args()
-    config = load_config()
+    config = load_config()[args.ver]
     config.update(vars(args))
     # --- load a tokenizer --- #
     tokenizer = BertTokenizer.from_pretrained(config['tokenizer'])  # pre-trained on colloquial data

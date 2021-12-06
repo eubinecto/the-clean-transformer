@@ -12,10 +12,11 @@ from dekorde.paths import transformer_paths
 
 def main():
     parser = argparse.ArgumentParser()
+    parser.add_argument("--ver", type=str, default="overfit")
     parser.add_argument("--num_workers", type=int, default=4)
     parser.add_argument("--log_every_n_steps", type=int, default=1)
     args = parser.parse_args()
-    config = load_config()
+    config = load_config()[args.ver]
     config.update(vars(args))
     # --- load a tokenizer --- #
     tokenizer = BertTokenizer.from_pretrained(config['tokenizer'])  # pre-trained on colloquial data
@@ -41,11 +42,15 @@ def main():
                              logger=logger)
         # start training transformer
         trainer.fit(model=transformer, datamodule=datamodule)
-    # save them only if the training is properly done
-    if trainer.current_epoch == config['max_epochs']:
-        transformer_ckpt, tokenizer_dir = transformer_paths()
-        trainer.save_checkpoint(transformer_ckpt)
-        tokenizer.save_pretrained(tokenizer_dir)
+        # save them only if the training is properly done
+        if trainer.current_epoch == config['max_epochs']:
+            transformer_ckpt, tokenizer_dir = transformer_paths()
+            trainer.save_checkpoint(transformer_ckpt)
+            tokenizer.save_pretrained(tokenizer_dir)
+            artifact = wandb.Artifact(name="transformer", type="model", metadata=config)
+            artifact.add_file(transformer_ckpt, "transformer.ckpt")
+            artifact.add_dir(tokenizer_dir)
+            run.log_artifact(artifact, aliases=["latest", config['ver']])
 
 
 if __name__ == '__main__':

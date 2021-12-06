@@ -1,8 +1,9 @@
+import wandb
 import argparse
 from transformers import BertTokenizer
 from dekorde.components.transformer import Transformer
 from dekorde.data import DekordeDataModule
-from dekorde.loaders import load_config, load_seoul2jeju
+from dekorde.loaders import load_config
 import pytorch_lightning as pl
 import torch
 
@@ -26,7 +27,8 @@ def main():
                               config['dropout'],
                               tokenizer.pad_token_id,
                               config['lr'])
-    datamodule = DekordeDataModule(config, tokenizer)
+    with wandb.init(entity="eubinecto", project="dekorde") as run:
+        datamodule = DekordeDataModule(run, config, tokenizer)
     # save the model and the tokenizer
     trainer = pl.Trainer(fast_dev_run=True,  # 에폭을 한번만 돈다. 모델 저장도 안함. 디버깅으로 제격
                          gpus=torch.cuda.device_count())

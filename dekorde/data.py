@@ -1,12 +1,11 @@
 import torch
-from typing import Tuple, Optional
+from typing import Tuple, Optional, List
 from torch.utils.data import Dataset, DataLoader
 from torch.utils.data.dataset import random_split, Subset
 from pytorch_lightning import LightningDataModule
 from transformers import BertTokenizer
-
+from wandb.sdk.wandb_run import Run
 from dekorde.builders import TrainInputsBuilder, LabelsBuilder
-from dekorde.loaders import load_seoul2jeju
 
 
 class DekordeDataset(Dataset):
@@ -24,18 +23,25 @@ class DekordeDataset(Dataset):
 
 class DekordeDataModule(LightningDataModule):
 
-    def __init__(self, config: dict, tokenizer: BertTokenizer):
+    def __init__(self, run: Run, config: dict, tokenizer: BertTokenizer):
         super().__init__()
+        self.run = run
         self.config = config
         self.tokenizer = tokenizer
+        self.seoul2jeju: Optional[List[Tuple[str, str]]] = None
         self.train: Optional[Subset] = None
         self.val: Optional[Subset] = None
         self.test: Optional[Subset] = None
 
+    def prepare_data(self) -> None:
+        # download the data
+        artifact = self.run.use_artifact(f"seoul2jeju:{self.config['data_ver']}")
+        table = artifact.get("seoul2jeju")
+        self.seoul2jeju = [(row[0], row[1]) for row in table.data]
+
     def setup(self, *args, **kwargs) -> None:
-        seoul2jeju = load_seoul2jeju()
-        seouls = [seoul for seoul, _ in seoul2jeju]
-        jejus = [jeju for _, jeju in seoul2jeju]
+        seouls = [seoul for seoul, _ in self.seoul2jeju]
+        jejus = [jeju for _, jeju in self.seoul2jeju]
         # build the tensors here
         X = TrainInputsBuilder(self.tokenizer, self.config['max_length'])(srcs=jejus, tgts=seouls)  # (N, L)
         y = LabelsBuilder(self.tokenizer, self.config['max_length'])(tgts=seouls)  # (N, L)
@@ -61,6 +67,4 @@ class DekordeDataModule(LightningDataModule):
                           shuffle=False, num_workers=self.config['num_workers'])
 
     def predict_dataloader(self) -> DataLoader:
-        # we use the validation set to run predictions
-        return DataLoader(self.val, batch_size=self.config['batch_size'],
-                          shuffle=False, num_workers=self.config['num_workers'])
+        pass

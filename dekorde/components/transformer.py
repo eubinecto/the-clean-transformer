@@ -1,6 +1,5 @@
-from typing import Tuple
-
 import torch
+from typing import Tuple
 from argparse import Namespace
 from torch.nn import functional as F
 from dekorde.components.encoder import Encoder
@@ -73,8 +72,14 @@ class Transformer(LightningModule):
             'loss': loss
         }
 
+    def on_train_batch_end(self, outputs: dict, *args, **kwargs) -> None:
+        self.log("Train/loss", outputs['loss'], on_step=True)
+
     def validation_step(self, batch: Tuple[torch.Tensor, torch.Tensor], *args, **kwargs) -> dict:
         return self.training_step(batch)
+
+    def on_validation_batch_end(self, outputs: dict, *args, **kwargs) -> None:
+        self.log("Validation/loss", outputs['loss'], on_step=True)
 
     def configure_optimizers(self) -> torch.optim.Adam:
         return torch.optim.Adam(params=self.parameters(), lr=self.hparams['lr'])

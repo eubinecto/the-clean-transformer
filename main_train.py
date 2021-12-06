@@ -1,11 +1,13 @@
+import torch
+import wandb
 import argparse
+from pytorch_lightning.loggers import WandbLogger
 from transformers import BertTokenizer
 from dekorde.components.transformer import Transformer
 from dekorde.data import DekordeDataModule
-from dekorde.loaders import load_config, load_seoul2jeju
+from dekorde.loaders import load_config
 import pytorch_lightning as pl
-import torch
-from dekorde.paths import TRANSFORMER_CKPT, TOKENIZER_DIR
+from dekorde.paths import transformer_paths
 
 
 def main():
@@ -28,18 +30,22 @@ def main():
                               config['dropout'],
                               tokenizer.pad_token_id,
                               config['lr'])
-    datamodule = DekordeDataModule(config, tokenizer)
     # save the model and the tokenizer
-    trainer = pl.Trainer(max_epochs=config['max_epochs'],
-                         log_every_n_steps=config['log_every_n_steps'],
-                         gpus=torch.cuda.device_count(),
-                         enable_checkpointing=False,
-                         logger=False)
-    # start training transformer
-    trainer.fit(model=transformer, datamodule=datamodule)
-    # save the model and the tokenizer
-    trainer.save_checkpoint(TRANSFORMER_CKPT)
-    tokenizer.save_pretrained(TOKENIZER_DIR)
+    with wandb.init(entity="eubinecto", project="dekorde", config=config) as run:
+        datamodule = DekordeDataModule(run, config, tokenizer)
+        logger = WandbLogger(log_model=False)
+        trainer = pl.Trainer(max_epochs=config['max_epochs'],
+                             log_every_n_steps=config['log_every_n_steps'],
+                             gpus=torch.cuda.device_count(),
+                             enable_checkpointing=False,
+                             logger=logger)
+        # start training transformer
+        trainer.fit(model=transformer, datamodule=datamodule)
+    # save them only if the training is properly done
+    if trainer.current_epoch == config['max_epochs']:
+        transformer_ckpt, tokenizer_dir = transformer_paths()
+        trainer.save_checkpoint(transformer_ckpt)
+        tokenizer.save_pretrained(tokenizer_dir)
 
 
 if __name__ == '__main__':

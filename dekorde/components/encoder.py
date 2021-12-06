@@ -9,9 +9,9 @@ class EncoderLayer(torch.nn.Module):
         super().__init__()
         # any layers to optimise?
         self.mhsa_layer = MultiHeadAttentionLayer(hidden_size, max_length, heads, masked=False)
+        self.layer_norm_1 = torch.nn.LayerNorm(hidden_size)
         self.ffn = FeedForward(hidden_size, dropout)
-        self.norm_1 = torch.nn.LayerNorm(hidden_size)
-        self.norm_2 = torch.nn.LayerNorm(hidden_size)
+        self.layer_norm_2 = torch.nn.LayerNorm(hidden_size)
 
     def forward(self, inputs: Tuple[torch.Tensor, torch.Tensor]) -> Tuple[torch.Tensor, torch.Tensor]:
         """
@@ -19,11 +19,11 @@ class EncoderLayer(torch.nn.Module):
         :return: src_hidden: (N, L, H)
         """
         src_hidden, src_mask = inputs
-        out_ = self.mhsa_layer.forward(Q=src_hidden, K=src_hidden, V=src_hidden,
-                                       key_mask=src_mask)
-        out_ = self.norm_1(out_) + src_hidden
-        out_ = self.ffn(out_)
-        src_hidden = self.norm_2(out_) + out_  # src_hidden is now updated
+        src_hidden_ = self.mhsa_layer(Q=src_hidden, K=src_hidden, V=src_hidden,
+                                      key_mask=src_mask)
+        src_hidden_ = self.layer_norm_1(src_hidden_) + src_hidden_
+        src_hidden_ = self.ffn(src_hidden_)
+        src_hidden = self.layer_norm_2(src_hidden_) + src_hidden_  # src_hidden is now updated
         return src_hidden, src_mask
 
 

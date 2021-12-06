@@ -1,6 +1,5 @@
 import torch
 import numpy as np
-from dekorde.tensors import LookAheadMaskBuilder
 
 
 class MultiHeadAttentionLayer(torch.nn.Module):
@@ -28,7 +27,7 @@ class MultiHeadAttentionLayer(torch.nn.Module):
         self.W_v = torch.nn.Linear(hidden_size, hidden_size)
         self.W_o = torch.nn.Linear(hidden_size, hidden_size)  # for aggregating the multi-head outputs.
         # --- any constant tensors must be registered to a buffer --- #
-        self.register_buffer("lookahead_mask", LookAheadMaskBuilder(max_length)())
+        self.register_buffer("lookahead_mask", torch.tril(torch.ones(size=(max_length, max_length)), diagonal=0).long())
 
     def forward(self, Q: torch.Tensor, K: torch.Tensor, V: torch.Tensor, key_mask: torch.Tensor) -> torch.Tensor:
         """
@@ -38,20 +37,21 @@ class MultiHeadAttentionLayer(torch.nn.Module):
         :param key_mask (N, L)
         :return: hiddens (N, L, H)
         """
+        # --- get batch_size --- #
+        N, _, _ = Q.size()
         # --- learn patterns from Q, K, V --- #
         Q_ = self.W_q(Q)  # (N, L, H) * (H, H) -> (N, L, H)
         K_ = self.W_k(K)  # (N, L, H) * (H, H) -> (N, L, H)
         V_ = self.W_v(V)  # (N, L, H) * (H, H) -> (N, L, H)
         # transform them into multi-heads
-        N = Q_.shape[0]
         # --- split Q, K, V into multi-heads --- #
         # (N, L, H) -> (N, heads, L, H // heads)
         # 각 시간대 (L) 별로, 여러개의 확률분포를 허용한다 (heads).
         # 단, 나중에 모든 해드를 융합했을 때 결국 single head의 출력과 같아지도록,
         # hidden_size = hidden_size / heads 로 설정한다.
-        Q_ = Q_.reshape(N, self.heads, self.max_length, self.hidden_size // self.heads)
-        K_ = K_.reshape(N, self.heads, self.max_length, self.hidden_size // self.heads)
-        V_ = V_.reshape(N, self.heads, self.max_length, self.hidden_size // self.heads)
+        Q_ = Q_.view(N, self.heads, self.max_length, self.hidden_size // self.heads)
+        K_ = K_.view(N, self.heads, self.max_length, self.hidden_size // self.heads)
+        V_ = V_.view(N, self.heads, self.max_length, self.hidden_size // self.heads)
         # compute the scaled dot product attention
         concats = self.scaled_dot_product_attention(Q_, K_, V_, key_mask)  # ... -> (N, L, H)
         hiddens = self.W_o(concats)  # (N, L, H) * (H, H) -> (N, L, H)
@@ -93,7 +93,7 @@ class MultiHeadAttentionLayer(torch.nn.Module):
         # that is, we reduce the matrices over the "j" dimension - the key dimension
         contexts = torch.einsum("abij,abjc->abic", attentions, V)
         # heads, H // heads -> H로 reshape하면, 결국엔 concat한 것이랑 같은 결과.
-        concats = contexts.reshape(N, self.max_length, self.hidden_size)  # ... -> (N, L, H)
+        concats = contexts.view(N, self.max_length, self.hidden_size)  # ... -> (N, L, H)
         return concats
 
     def build_mask(self, key_mask: torch.Tensor):
@@ -108,6 +108,6 @@ class MultiHeadAttentionLayer(torch.nn.Module):
         # if masked, apply (logical-and it) the lookahead mask
         if self.masked:
             lookahead_mask_ = self.lookahead_mask.view(1, 1, L, L)\
-                                  .expand(N, self.heads, -1, -1)
+                                                 .expand(N, self.heads, -1, -1)
             mask = torch.logical_and(mask, lookahead_mask_)
         return mask

@@ -1,14 +1,28 @@
+from typing import Tuple
+
 import torch
+from argparse import Namespace
 from torch.nn import functional as F
 from dekorde.components.encoder import Encoder
 from dekorde.components.decoder import Decoder
+from pytorch_lightning import LightningModule
+from pytorch_lightning.utilities.types import EVAL_DATALOADERS, TRAIN_DATALOADERS
 
 
-class Transformer(torch.nn.Module):
+class Transformer(LightningModule):
+
     def __init__(self, hidden_size: int, vocab_size: int,
-                 max_length: int, heads: int, depth: int, dropout: float):
+                 max_length: int, heads: int, depth: int, dropout: float, pad_token_id: int,
+                 lr: float):
         super().__init__()
-        self.vocab_size = vocab_size
+        self.save_hyperparameters(Namespace(hidden_size=hidden_size,
+                                            vocab_size=vocab_size,
+                                            max_length=max_length,
+                                            heads=heads,
+                                            depth=depth,
+                                            dropout=dropout,
+                                            pad_token_id=pad_token_id,
+                                            lr=lr))
         # --- layers to optimise --- #
         self.token_embeddings = torch.nn.Embedding(num_embeddings=vocab_size, embedding_dim=hidden_size)
         self.pos_embeddings = torch.nn.Embedding(num_embeddings=max_length, embedding_dim=hidden_size)
@@ -20,13 +34,10 @@ class Transformer(torch.nn.Module):
     def forward(self, src_ids: torch.Tensor, tgt_ids: torch.Tensor,
                 src_mask: torch.Tensor, tgt_mask: torch.Tensor) -> torch.Tensor:
         """
-        :param src_ids  (N, L)
-        :param tgt_ids  (N, L)
-        :param src_mask (N, L)
-        :param tgt_mask (N, L)
         :return tgt_hidden: (N, L, H)
         """
-        N, _ = src_ids.size()
+        N, _, = src_ids.size()
+        # all of them are (N, L)
         positions = self.positions.repeat(N, 1)  # (L) -> (N, L)
         # --- get the embedding vectors --- #
         src_embed = self.token_embeddings(src_ids) + self.pos_embeddings(positions)  # positional encoding
@@ -36,21 +47,65 @@ class Transformer(torch.nn.Module):
         tgt_hidden = self.decoder(src_hidden, tgt_embed, src_mask, tgt_mask)  # ... (N, L, H)
         return tgt_hidden
 
-    def training_step(self, inputs: torch.Tensor, targets: torch.Tensor) -> torch.Tensor:
+    def on_train_start(self) -> None:
+        # this is important!
+        for param in self.parameters():
+            if param.dim() > 1:
+                torch.nn.init.xavier_uniform_(param)
+
+    def training_step(self, batch: Tuple[torch.Tensor, torch.Tensor], *args, **kwargs) -> dict:
         """
         A function for computing the loss for this batch.
-        :param inputs: (N, 2, 2, L) - 0: input_ids / 1: attention_mask
-        :param targets: (N, L) - target
         :return: a scalar tensor
         """
-        # all of them are (N, L)
-        src_ids, src_mask = inputs[:, 0], inputs[:, 1]
-        tgt_ids, tgt_mask = targets[:, 0, 0], targets[:, 0, 1]
-        tgt_y_ids, tgt_y_mask = targets[:, 1, 0], targets[:, 1, 1]
+        X, y = batch
+        src_ids, src_mask = X[:, 0, 0], X[:, 0, 1]
+        tgt_ids, tgt_mask = X[:, 1, 0], X[:, 1, 1]
         tgt_hidden = self.forward(src_ids, tgt_ids, src_mask, tgt_mask)  # ... -> (N, L, H)
+        # reuse the embeddings as the classifier
         cls = self.token_embeddings.weight  # (|V|, H)
         # reduce the matrices over the dimension H.
         # cross entropy of 3D input? - https://stackoverflow.com/a/63650146
         logits = torch.einsum("nlh,vh->nvl", tgt_hidden, cls)  # (N, |V|, L)
-        loss = F.cross_entropy(logits, tgt_y_ids).sum()  # (N, |V|, L), (N, L) -> (N, 1) -> (1)
-        return loss
+        # (N, |V|, L), (N, L) -> (N, 1) -> (1)
+        loss = F.cross_entropy(logits, y, ignore_index=self.hparams['pad_token_id']).sum()
+        return {
+            'loss': loss
+        }
+
+    def validation_step(self, batch: Tuple[torch.Tensor, torch.Tensor], *args, **kwargs) -> dict:
+        return self.training_step(batch)
+
+    def configure_optimizers(self) -> torch.optim.Adam:
+        return torch.optim.Adam(params=self.parameters(), lr=self.hparams['lr'])
+
+    def predict(self, X: torch.Tensor) -> torch.Tensor:
+        """
+        :param X: (N, 2, 2, L)
+        :return: (N, L)
+        """
+        src_ids, src_mask = X[:, 0, 0], X[:, 0, 1]
+        tgt_ids, tgt_mask = X[:, 1, 0], X[:, 1, 1]
+        for time in range(1, self.hparams['max_length']):
+            tgt_hidden = self.forward(src_ids, tgt_ids, src_mask, tgt_mask)  # (N, 2, 2, L) -> (N, L, H)
+            cls = self.token_embeddings.weight
+            logits = torch.einsum("nlh,vh->nvl", tgt_hidden, cls)  # (N, L, H) * (|V|, H) -> (N, |V|, L)
+            probs = torch.softmax(logits, dim=1)  # (N,|V|, L) -> (N, |V|, L)
+            indices = torch.argmax(probs, dim=1)  # (N,|V| ,L) -> (N, L)
+            preds = indices[:, time]  # (N, L) -> (N, 1)
+            tgt_ids[:, time] = preds
+            tgt_mask[:, time] = 1
+        return tgt_ids
+
+    # just ignore these
+    def train_dataloader(self) -> TRAIN_DATALOADERS:
+        pass
+
+    def test_dataloader(self) -> EVAL_DATALOADERS:
+        pass
+
+    def val_dataloader(self) -> EVAL_DATALOADERS:
+        pass
+
+    def predict_dataloader(self) -> EVAL_DATALOADERS:
+        pass

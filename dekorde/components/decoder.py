@@ -9,35 +9,37 @@ class DecoderLayer(torch.nn.Module):
         super().__init__()
         # masked, multi-head self-attention layer.
         self.masked_mhsa_layer = MultiHeadAttentionLayer(hidden_size, max_length, heads, masked=True)
+        self.layer_norm_1 = torch.nn.LayerNorm(hidden_size)
         # not masked, multi-head encoder-decoder attention layer.
         self.mheda_layer = MultiHeadAttentionLayer(hidden_size, max_length, heads, masked=False)
+        self.layer_norm_2 = torch.nn.LayerNorm(hidden_size)
         # position-wise feed-forward network.
         self.ffn = FeedForward(hidden_size, dropout)
-        # normalisation layers
-        self.norm_1 = torch.nn.LayerNorm(hidden_size)
-        self.norm_2 = torch.nn.LayerNorm(hidden_size)
-        self.norm_3 = torch.nn.LayerNorm(hidden_size)
+        self.layer_norm_3 = torch.nn.LayerNorm(hidden_size)
 
     def forward(self, inputs: Tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor])\
             -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
         """
-        :param inputs: (src_hidden = (N, L, H), tgt_hidden = (N, L, H), padding_mask (N, L))
+        :param inputs: (src_hidden = (N, L, H), tgt_hidden_ = (N, L, H), padding_mask (N, L))
         :return: src_hidden (as-is), tgt_hidden (updated), padding_mask (as-is)
         """
         src_hidden, tgt_hidden, src_mask, tgt_mask = inputs
-        out_ = self.masked_mhsa_layer.forward(Q=tgt_hidden, K=tgt_hidden, V=tgt_hidden,
-                                              key_mask=tgt_mask)
-        out_ = self.norm_1(out_) + tgt_hidden
+        # --- contextualise
+        tgt_hidden_ = self.masked_mhsa_layer(Q=tgt_hidden, K=tgt_hidden, V=tgt_hidden,
+                                             key_mask=tgt_mask)
+        tgt_hidden_ = self.layer_norm_1(tgt_hidden_) + tgt_hidden_
         # query = target
         # key = source
         # value = weighted average of source
-        out_ = self.mheda_layer.forward(Q=out_, K=src_hidden, V=src_hidden,
-                                        key_mask=src_mask)
-        out_ = self.norm_2(out_) + out_
-        out_ = self.ffn(out_)
+        tgt_hidden_ = self.mheda_layer(Q=tgt_hidden_, K=src_hidden, V=src_hidden,
+                                       key_mask=src_mask)
+        tgt_hidden_ = self.layer_norm_2(tgt_hidden_) + tgt_hidden_
+
+        tgt_hidden_ = self.ffn(tgt_hidden_)
+        tgt_hidden_ = self.layer_norm_3(tgt_hidden_) + tgt_hidden_  # tgt_hidden_ updated
+
         # what exactly are you updating? aren't you updating the source hidden?
-        tgt_hidden = self.norm_3(out_) + out_  # tgt_hidden updated
-        return src_hidden, tgt_hidden, src_mask, tgt_mask
+        return src_hidden, tgt_hidden_, src_mask, tgt_mask
 
 
 class Decoder(torch.nn.Module):
@@ -49,8 +51,7 @@ class Decoder(torch.nn.Module):
         )
 
     def forward(self, src_hidden: torch.Tensor, tgt_embed: torch.Tensor,
-                src_mask: torch.Tensor, tgt_mask: torch.Tensor)\
-            -> torch.Tensor:
+                src_mask: torch.Tensor, tgt_mask: torch.Tensor) -> torch.Tensor:
         """
         :param src_hidden: (N, L, H)
         :param tgt_embed: (N, L, H)

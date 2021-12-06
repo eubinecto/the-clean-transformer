@@ -1,9 +1,9 @@
-from dekorde.loaders import load_gib2kor
+from dekorde.loaders import load_seoul2jeju
 from pprint import pprint
 
 
 def main():
-    pprint(load_gib2kor())
+    pprint(load_seoul2jeju())
 
 
 if __name__ == '__main__':

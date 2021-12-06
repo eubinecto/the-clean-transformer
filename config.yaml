@@ -1,0 +1,11 @@
+hidden_size:  64
+heads: 8
+depth: 3
+epochs: 300
+batch_size: 50
+max_length: 30
+lr: 0.0007
+bos_token: "[BOS]"
+eos_token: "[EOS]"
+tokenizer: "beomi/kcbert-base"
+dropout: 0.8

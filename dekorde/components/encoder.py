@@ -1,44 +1,44 @@
-from typing import Tuple
-
 import torch
+from typing import Tuple
 from dekorde.components.mha import MultiHeadAttentionLayer
 from dekorde.components.ffn import FeedForward
 
 
 class EncoderLayer(torch.nn.Module):
-    def __init__(self, hidden_size: int, max_length: int, heads: int):
+    def __init__(self, hidden_size: int, max_length: int, heads: int, dropout: float):
         super().__init__()
         # any layers to optimise?
-        self.multi_head_self_attention_layer = MultiHeadAttentionLayer(hidden_size, max_length, heads)
+        self.mhsa_layer = MultiHeadAttentionLayer(hidden_size, max_length, heads, masked=False)
+        self.ffn = FeedForward(hidden_size, dropout)
         self.norm_1 = torch.nn.LayerNorm(hidden_size)
-        self.ffn = FeedForward(hidden_size)
         self.norm_2 = torch.nn.LayerNorm(hidden_size)
 
     def forward(self, inputs: Tuple[torch.Tensor, torch.Tensor]) -> Tuple[torch.Tensor, torch.Tensor]:
         """
-        :param inputs: Tuple[H_x, padding_mask]
-        :return: H_x: (N, L, H)
+        :param inputs: Tuple[src_hidden, src_mask]
+        :return: src_hidden: (N, L, H)
         """
-        H_x, padding_mask = inputs
-        Out_ = self.multi_head_self_attention_layer.forward(H_q=H_x, H_k=H_x, H_v=H_x, padding_mask=padding_mask) + H_x
-        Out_ = self.norm_1(Out_)
-        Out_ = self.ffn(Out_) + Out_
-        Out = self.norm_2(Out_)  # this is the new H_x
-        return Out, padding_mask
+        src_hidden, src_mask = inputs
+        out_ = self.mhsa_layer.forward(Q=src_hidden, K=src_hidden, V=src_hidden,
+                                       key_mask=src_mask)
+        out_ = self.norm_1(out_) + src_hidden
+        out_ = self.ffn(out_)
+        src_hidden = self.norm_2(out_) + out_  # src_hidden is now updated
+        return src_hidden, src_mask
 
 
 class Encoder(torch.nn.Module):
-    def __init__(self, hidden_size: int, max_length: int, heads: int, depth: int):
+    def __init__(self, hidden_size: int, max_length: int, heads: int, depth: int, dropout: float):
         super().__init__()
         self.encoder_layers = torch.nn.Sequential(
-            *[EncoderLayer(hidden_size, max_length, heads) for _ in range(depth)]
+            *[EncoderLayer(hidden_size, max_length, heads, dropout) for _ in range(depth)]
         )
 
-    def forward(self, X_embed: torch.Tensor, padding_mask: torch.Tensor) -> torch.Tensor:
+    def forward(self, src_embed: torch.Tensor, src_mask: torch.Tensor) -> torch.Tensor:
         """
-        :param X_embed: (N, L, E)
-        :param padding_mask: (N, L)
-        :return: H_x: (N, L, H)
+        :param src_embed: (N, L, H)
+        :param src_mask: (N, L)
+        :return: input_hidden: (N, L, H)
         """
-        H_x = self.encoder_layers((X_embed, padding_mask))
-        return H_x
+        input_hidden, _ = self.encoder_layers((src_embed, src_mask))
+        return input_hidden

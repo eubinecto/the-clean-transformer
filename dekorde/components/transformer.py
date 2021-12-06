@@ -1,89 +1,56 @@
 import torch
+from torch.nn import functional as F
 from dekorde.components.encoder import Encoder
 from dekorde.components.decoder import Decoder
-from torch.nn import functional as F
 
 
 class Transformer(torch.nn.Module):
-
     def __init__(self, hidden_size: int, vocab_size: int,
-                 max_length: int, heads: int, depth: int, start_token_id: int, lookahead_mask: torch.Tensor,
-                 device: torch.device):
+                 max_length: int, heads: int, depth: int, dropout: float):
         super().__init__()
-        # --- hyper parameters --- #
-        self.max_length = max_length
-        self.start_token_id = start_token_id
-        self.lookahead_mask = lookahead_mask
-        self.device = device
+        self.vocab_size = vocab_size
         # --- layers to optimise --- #
         self.token_embeddings = torch.nn.Embedding(num_embeddings=vocab_size, embedding_dim=hidden_size)
         self.pos_embeddings = torch.nn.Embedding(num_embeddings=max_length, embedding_dim=hidden_size)
-        self.encoder = Encoder(hidden_size, max_length, heads, depth)  # the encoder stack
-        self.decoder = Decoder(hidden_size, max_length, heads, depth, lookahead_mask)  # the decoder stack
-        self.to(device)
+        self.encoder = Encoder(hidden_size, max_length, heads, depth, dropout)  # the encoder stack
+        self.decoder = Decoder(hidden_size, max_length, heads, depth, dropout)  # the decoder stack
+        # --- we register any constant tensors to the buffer instead of using to(device) --- #
+        self.register_buffer("positions", torch.arange(max_length))  # (L)
 
-    def forward(self, X: torch.Tensor, Y: torch.Tensor) -> torch.Tensor:
+    def forward(self, src_ids: torch.Tensor, tgt_ids: torch.Tensor,
+                src_mask: torch.Tensor, tgt_mask: torch.Tensor) -> torch.Tensor:
         """
-        :param X: (N, 2, L)
-        :param Y: (N, L)
-        :return H_y: (N, L, H)
+        :param src_ids  (N, L)
+        :param tgt_ids  (N, L)
+        :param src_mask (N, L)
+        :param tgt_mask (N, L)
+        :return tgt_hidden: (N, L, H)
         """
-        N = X.shape[0]
-        X_ids = X[:, 0]
-        padding_mask = X[:, 1]
-        pos_indices = torch.arange(self.max_length).expand(N, self.max_length).to(self.device)
+        N, _ = src_ids.size()
+        positions = self.positions.repeat(N, 1)  # (L) -> (N, L)
         # --- get the embedding vectors --- #
-        pos_embed = self.pos_embeddings(pos_indices)
-        X_embed = self.token_embeddings(X_ids) + pos_embed  # positional encoding
-        Y_embed = self.token_embeddings(Y) + pos_embed  # positional encoding
+        src_embed = self.token_embeddings(src_ids) + self.pos_embeddings(positions)  # positional encoding
+        tgt_embed = self.token_embeddings(tgt_ids) + self.pos_embeddings(positions)  # positional encoding
         # --- generate the hidden vectors --- #
-        H_x = self.encoder(X_embed)  # (N, L, H) -> (N, L, H)
-        H_y = self.decoder(H_x, Y_embed)  # (N, L, H), (N, L, H) -> (N, L, H)
-        return H_y
+        src_hidden = self.encoder(src_embed, src_mask)  # (N, L, H) -> (N, L, H)
+        tgt_hidden = self.decoder(src_hidden, tgt_embed, src_mask, tgt_mask)  # ... (N, L, H)
+        return tgt_hidden
 
-    def training_step(self, X: torch.Tensor, Y: torch.Tensor) -> torch.Tensor:
+    def training_step(self, inputs: torch.Tensor, targets: torch.Tensor) -> torch.Tensor:
         """
         A function for computing the loss for this batch.
-        :param X: (N, L) - source
-        :param Y: (N, 2, L) - target
-        :return: loss (1,)
+        :param inputs: (N, 2, 2, L) - 0: input_ids / 1: attention_mask
+        :param targets: (N, L) - target
+        :return: a scalar tensor
         """
-        Y_l = Y[:, 0]  # starts from " [SOS]", ends just before the last character.
-        Y_r = Y[:, 1]  # starts after "[SOS]", ends with the last character.
-        H_y = self.forward(X, Y_l)  # ... -> (N, L, H)
-        W_hy = self.token_embeddings.weight  # (|V|, H)
+        # all of them are (N, L)
+        src_ids, src_mask = inputs[:, 0], inputs[:, 1]
+        tgt_ids, tgt_mask = targets[:, 0, 0], targets[:, 0, 1]
+        tgt_y_ids, tgt_y_mask = targets[:, 1, 0], targets[:, 1, 1]
+        tgt_hidden = self.forward(src_ids, tgt_ids, src_mask, tgt_mask)  # ... -> (N, L, H)
+        cls = self.token_embeddings.weight  # (|V|, H)
         # reduce the matrices over the dimension H.
         # cross entropy of 3D input? - https://stackoverflow.com/a/63650146
-        logits = torch.einsum("abc,dc->adb", H_y, W_hy)  # (N, |V|, L)
-        loss = F.cross_entropy(logits, Y_r)  # (N, |V|, L), (N, L) -> (N, 1)
-        loss = loss.sum()  # (N, 1) -> (1,)
+        logits = torch.einsum("nlh,vh->nvl", tgt_hidden, cls)  # (N, |V|, L)
+        loss = F.cross_entropy(logits, tgt_y_ids).sum()  # (N, |V|, L), (N, L) -> (N, 1) -> (1)
         return loss
-
-    def infer(self, X: torch.Tensor) -> torch.Tensor:
-        """
-        :param X: (N, L), a batch of input_ids
-        :return Y: (N, L), a batch of input_ids
-        """
-        N, L = X.shape
-        pos_indices = torch.arange(self.max_length).expand(N, self.max_length).to(self.device)
-        # --- get the embedding vectors --- #
-        pos_embed = self.pos_embeddings(pos_indices)
-        X_embed = self.token_embeddings(X) + pos_embed
-        H_x = self.encoder(X_embed)  # ... -> (N, L, H)
-        # Y = torch.zeros(size=(N, L)).long().to(self.device)
-        # Y = torch.ones(size=(N, L)).long().to(self.device)  # ones를 넣으면, 1을 정답으로 생각하려나?
-        Y = torch.full(size=(N, L), fill_value=410).to(self.device)  # 긕
-        # Y = torch.full(size=(N, L), fill_value=411)
-        Y[:, 0] = self.start_token_id  # (N, L)
-        W_hy = self.token_embeddings.weight  # (|V|, H)
-
-        for time in range(1, L):
-            # what do we do here?
-            Y_embed = self.token_embeddings(Y) + pos_embed
-            H_y = self.decoder(H_x, Y_embed)  # (N, L, H), (N, L, H) -> (N, L, H)
-            logits = torch.einsum("abc,dc->abd", H_y, W_hy)  # (N, L, H) * (|V|, H) -> (N, L, |V|)
-            probs = torch.softmax(logits, dim=2)
-            indices = torch.argmax(probs, dim=2)
-            predicted_token_ids = indices[:, time]  # (N, L) -> (N, 1)
-            Y[:, time] = predicted_token_ids
-        return Y

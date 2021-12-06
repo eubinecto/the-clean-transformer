@@ -1,8 +1,9 @@
 from typing import List, Tuple
-from dekorde.paths import CONF_JSON,  SEOUL2JEJU_TSV
+from dekorde.paths import CONFIG_JSON,  SEOUL2JEJU_TSV
 import torch
 import json
 import csv
+import yaml
 
 
 def load_seoul2jeju() -> List[Tuple[str, str]]:
@@ -15,10 +16,9 @@ def load_seoul2jeju() -> List[Tuple[str, str]]:
         ]
 
 
-def load_conf() -> dict:
-    with open(CONF_JSON, 'r') as fh:
-        conf = json.loads(fh.read())
-    return conf
+def load_config() -> dict:
+    with open(CONFIG_JSON, 'r') as fh:
+        return yaml.safe_load(fh)
 
 
 def load_device() -> torch.device:

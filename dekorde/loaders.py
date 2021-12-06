@@ -1,5 +1,4 @@
-from typing import List, Tuple
-from dekorde.paths import CONFIG_JSON,  SEOUL2JEJU_TSV
+from dekorde.paths import CONFIG_JSON
 import yaml
 
 

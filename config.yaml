@@ -5,7 +5,7 @@ train:
     heads: 8
     depth: 3
     max_epochs: 2
-    max_length: 30
+    max_length: 40
     batch_size: 64
     val_ratio: 0.15
     test_ratio: 0.15
@@ -21,7 +21,7 @@ train:
     heads: 8
     depth: 3
     max_epochs: 100
-    max_length: 30
+    max_length: 40
     batch_size: 128
     val_ratio: 0.15
     test_ratio: 0.15

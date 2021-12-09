@@ -1,39 +1,48 @@
-test:
-  hidden_size:  64
-  heads: 8
-  depth: 3
-  max_epochs: 100
-  batch_size: 64
-  val_ratio: 0.15
-  test_ratio: 0.15
-  max_length: 30
-  lr: 0.0001
-  bos_token: "[BOS]"
-  eos_token: "[EOS]"
-  tokenizer: "beomi/kcbert-base"
-  # just so that we can overfit the model to the training data
-  dropout: 0.0001
-  seed: 410
-  # shuffle the training set
-  shuffle: true
-  data_ver: v0
-overfit:
-  hidden_size: 64
-  heads: 8
-  depth: 3
-  max_epochs: 100
-  batch_size: 128
-  val_ratio: 0.15
-  test_ratio: 0.15
-  max_length: 30
-  lr: 0.0001
-  bos_token: "[BOS]"
-  eos_token: "[EOS]"
-  tokenizer: "beomi/kcbert-base"
-  # just so that we can overfit the model to the training data
-  dropout: 0.0
-  seed: 410
-  # shuffle the training set
-  shuffle: true
-  data_ver: v0
+# --- config for training a model --- #
+train:
+  first:
+    hidden_size:  64
+    heads: 8
+    depth: 3
+    max_epochs: 2
+    max_length: 30
+    batch_size: 64
+    val_ratio: 0.15
+    test_ratio: 0.15
+    lr: 0.0001
+    tokenizer: "wp"
+    dropout: 0.0001
+    seed: 410
+    shuffle: true
+    data_type: jeju2seoul
+    data_ver: v0
+  overfit:
+    hidden_size: 64
+    heads: 8
+    depth: 3
+    max_epochs: 100
+    max_length: 30
+    batch_size: 128
+    val_ratio: 0.15
+    test_ratio: 0.15
+    lr: 0.0001
+    tokenizer: "wp"
+    dropout: 0.0
+    seed: 410
+    # shuffle the training set
+    shuffle: true
+    data_type: jeju2seoul
+    data_ver: v0
+
+# --- config for building a tokenizer --- #
+build:
+  vocab_size: 3000
+  pad: "[PAD]"
+  pad_id: 0
+  unk: "[UNK]"
+  unk_id: 1
+  bos: "[BOS]"
+  bos_id: 2
+  eos: "[EOS]"
+  eos_id: 3
 

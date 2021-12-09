@@ -1,11 +1,20 @@
+"""
+Defining the dataset & the datamodule to be used for training
+"""
 import torch
-from typing import Tuple, Optional, List
+from typing import Tuple, Optional
+from tokenizers import Tokenizer
 from torch.utils.data import Dataset, DataLoader
 from torch.utils.data.dataset import random_split, Subset
 from pytorch_lightning import LightningDataModule
-from transformers import BertTokenizer
 from wandb.sdk.wandb_run import Run
 from dekorde.builders import TrainInputsBuilder, LabelsBuilder
+from dekorde.fetchers import fetch_jeju2seoul
+import os
+
+# to suppress warnings - we just allow parallelism
+# https://github.com/kakaobrain/pororo/issues/69#issuecomment-927564132
+os.environ["TOKENIZERS_PARALLELISM"] = "true"
 
 
 class DekordeDataset(Dataset):
@@ -21,27 +30,22 @@ class DekordeDataset(Dataset):
         return N
 
 
-class DekordeDataModule(LightningDataModule):
+class Jeju2SeoulDataModule(LightningDataModule):
 
-    def __init__(self, run: Run, config: dict, tokenizer: BertTokenizer):
+    def __init__(self, run: Run, config: dict, tokenizer: Tokenizer):
         super().__init__()
         self.run = run
         self.config = config
         self.tokenizer = tokenizer
-        self.seoul2jeju: Optional[List[Tuple[str, str]]] = None
+        # --- to be filled --- #
         self.train: Optional[Subset] = None
         self.val: Optional[Subset] = None
         self.test: Optional[Subset] = None
 
     def prepare_data(self) -> None:
-        # download the data
-        artifact = self.run.use_artifact(f"seoul2jeju:{self.config['data_ver']}")
-        table = artifact.get("seoul2jeju")
-        self.seoul2jeju = [(row[0], row[1]) for row in table.data]
-
-    def setup(self, *args, **kwargs) -> None:
-        seouls = [seoul for seoul, _ in self.seoul2jeju]
-        jejus = [jeju for _, jeju in self.seoul2jeju]
+        jeju2seoul = fetch_jeju2seoul(self.run)
+        jejus = [jeju for jeju, _ in jeju2seoul]
+        seouls = [seoul for _, seoul in jeju2seoul]
         # build the tensors here
         X = TrainInputsBuilder(self.tokenizer, self.config['max_length'])(srcs=jejus, tgts=seouls)  # (N, L)
         y = LabelsBuilder(self.tokenizer, self.config['max_length'])(tgts=seouls)  # (N, L)
@@ -50,6 +54,7 @@ class DekordeDataModule(LightningDataModule):
         val_size = int(len(dataset) * self.config["val_ratio"])
         test_size = int(len(dataset) * self.config["test_ratio"])
         train_size = len(dataset) - val_size - test_size
+        # split the dataset here
         self.train, self.val, self.test = \
             random_split(dataset, lengths=(train_size, val_size, test_size),
                          generator=torch.Generator().manual_seed(self.config['seed']))
@@ -66,5 +71,23 @@ class DekordeDataModule(LightningDataModule):
         return DataLoader(self.test, batch_size=self.config['batch_size'],
                           shuffle=False, num_workers=self.config['num_workers'])
 
+    # ignore this
+    def predict_dataloader(self):
+        pass
+
+
+# --- add more datamodule as you wish --- #
+class Kor2EngDataModule(LightningDataModule):
+
+    def train_dataloader(self) -> DataLoader:
+        pass
+
+    def test_dataloader(self) -> DataLoader:
+        pass
+
+    def val_dataloader(self) -> DataLoader:
+        pass
+
+    # ignore this
     def predict_dataloader(self) -> DataLoader:
         pass

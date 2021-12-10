@@ -27,13 +27,16 @@ def main():
     config = fetch_config()["build"]
     config.update(vars(args))
     # --- prepare a tokenizer --- #
+    special_tokens = [config['pad'], config['unk'], config['bos'], config['eos']]
     if config['ver'] == "bpe":
         # tokenizer = Tokenizer(BPE(unk_token=config['unk']))
         tokenizer = Tokenizer(BPE(unk_token=config['unk']))
-        trainer = BpeTrainer(vocab_size=config['vocab_size'])
+        trainer = BpeTrainer(vocab_size=config['vocab_size'],
+                             special_tokens=special_tokens)
     elif config['ver'] == "wp":
         tokenizer = Tokenizer(WordPiece(unk_token=config['unk']))  # noqa
-        trainer = WordPieceTrainer(vocab_size=config['vocab_size'])
+        trainer = WordPieceTrainer(vocab_size=config['vocab_size'],
+                                   special_tokens=special_tokens)
     else:
         raise ValueError(f"Invalid ver: {config['ver']}")
     # --- pre & post processing --- #

@@ -53,7 +53,7 @@ class Transformer(LightningModule, ABC):
         src_embeddings = self.token_embeddings(src_ids) + pos_encodings  # (N, L, H) + (N, L, H) -> (N, L, H)
         tgt_embeddings = self.token_embeddings(tgt_ids) + pos_encodings  # (N, L, H) + (N, L, H) -> (N, L, H)
         memory = self.encoder(src_embeddings, src_mask)  # ... -> (N, L, H)
-        hidden = self.decoder(memory, tgt_embeddings, src_mask, tgt_mask)  # ... (N, L, H)
+        hidden = self.decoder(tgt_embeddings, memory, tgt_mask, src_mask)  # ... (N, L, H)
         return hidden
 
     def step(self, X: torch.Tensor, y: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor]:

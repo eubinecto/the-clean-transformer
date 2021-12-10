@@ -5,7 +5,7 @@ train:
     ffn_size: 512
     heads: 32
     depth: 3
-    max_epochs: 100
+    max_epochs: 10
     max_length: 145
     batch_size: 64
     lr: 0.0001

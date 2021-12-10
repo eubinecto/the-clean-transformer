@@ -74,3 +74,4 @@ yarl==1.7.2
 yaspin==2.1.0
 zipp==3.6.0
 korpora~=0.2.0
+koila~=0.1

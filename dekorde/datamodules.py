@@ -2,6 +2,7 @@
 Defining the dataset & the datamodule to be used for training
 """
 import torch
+from koila import lazy
 from typing import Tuple, Optional, List
 from tokenizers import Tokenizer
 from torch.utils.data import Dataset, DataLoader
@@ -53,7 +54,10 @@ class Kor2EngDataModule(LightningDataModule):
         tgts = [tgt for _, tgt in src2tgt]
         X = TrainInputsBuilder(self.tokenizer, self.config['max_length'])(srcs=srcs, tgts=tgts)  # (N, L)
         y = LabelsBuilder(self.tokenizer, self.config['max_length'])(tgts=tgts)  # (N, L)
-        return DekordeDataset(X, y)
+        # to save gpu memory
+        X = lazy(X, batch=0)
+        y = lazy(y, batch=0)
+        return DekordeDataset(X, y)  # noqa
 
     def train_dataloader(self) -> DataLoader:
         return DataLoader(self.train, batch_size=self.config['batch_size'],

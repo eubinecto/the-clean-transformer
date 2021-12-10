@@ -4,6 +4,8 @@ import wandb
 import argparse
 from pytorch_lightning.loggers import WandbLogger
 from pytorch_lightning import Trainer
+from tqdm import tqdm
+
 from dekorde.models import Transformer
 from dekorde.fetchers import fetch_tokenizer, fetch_config
 from dekorde.paths import ROOT_DIR
@@ -15,7 +17,8 @@ def main():
     parser.add_argument("--ver", type=str, default="overfit")
     parser.add_argument("--num_workers", type=int, default=4)
     parser.add_argument("--log_every_n_steps", type=int, default=1)
-    parser.add_argument("--debug", action="store_true", default=False)
+    parser.add_argument("--fast_dev_run", action="store_true", default=False)
+    parser.add_argument("--overfit_batches", type=int, default=None)
     args = parser.parse_args()
     config = fetch_config()['train'][args.ver]
     config.update(vars(args))
@@ -35,7 +38,8 @@ def main():
         datamodule = Jeju2SeoulDataModule(run, config, tokenizer)
         # --- prepare the logger (wandb) and the trainer to use --- #
         logger = WandbLogger(log_model=False)
-        trainer = Trainer(fast_dev_run=config['debug'],
+        trainer = Trainer(fast_dev_run=config['fast_dev_run'],
+                          overfit_batches=config['overfit_batches'],
                           max_epochs=config['max_epochs'],
                           log_every_n_steps=config['log_every_n_steps'],
                           gpus=torch.cuda.device_count(),
@@ -44,7 +48,7 @@ def main():
         # --- start training --- #
         trainer.fit(model=transformer, datamodule=datamodule)
         # save them only if the training is properly done
-        if not config['debug'] and trainer.current_epoch == config['max_epochs'] - 1:
+        if not config['fast_dev_run'] and trainer.current_epoch == config['max_epochs'] - 1:
             ckpt_path = os.path.join(ROOT_DIR, "transformer.ckpt")
             trainer.save_checkpoint(ckpt_path)
             artifact = wandb.Artifact(name="transformer", type="model", metadata=config)

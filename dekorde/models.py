@@ -1,9 +1,11 @@
 import torch
 import numpy as np
 from argparse import Namespace
-from typing import Tuple
+from typing import Tuple, List
 from pytorch_lightning import LightningModule
 from torch.nn import functional as F
+from torch.optim.lr_scheduler import ReduceLROnPlateau
+from tqdm import tqdm
 
 
 class Transformer(LightningModule):
@@ -45,7 +47,7 @@ class Transformer(LightningModule):
 
     def on_train_start(self) -> None:
         # this is important!
-        for param in self.parameters():
+        for param in tqdm(self.parameters(), desc="initialising weights..."):
             if param.dim() > 1:
                 torch.nn.init.xavier_uniform_(param)
 
@@ -69,17 +71,27 @@ class Transformer(LightningModule):
             'loss': loss
         }
 
-    def on_train_batch_end(self, outputs: dict, *args, **kwargs) -> None:
-        self.log("Train/loss", outputs['loss'], on_step=True)
+    def training_epoch_end(self, outputs: List[dict]) -> None:
+        # to see an average performance over the batches in this specific epoch
+        avg_loss = torch.stack([output['loss'] for output in outputs]).mean()
+        self.log("Train/Average Loss", avg_loss)
 
     def validation_step(self, batch: Tuple[torch.Tensor, torch.Tensor], *args, **kwargs) -> dict:
         return self.training_step(batch)
 
-    def on_validation_batch_end(self, outputs: dict, *args, **kwargs) -> None:
-        self.log("Validation/loss", outputs['loss'], on_step=True)
+    def validation_epoch_end(self, outputs: List[dict]) -> None:
+        # to see an average performance over the batches in this specific epoch
+        avg_loss = torch.stack([output['loss'] for output in outputs]).mean()
+        self.log("Validation/Average Loss", avg_loss)
 
-    def configure_optimizers(self) -> torch.optim.Adam:
-        return torch.optim.Adam(params=self.parameters(), lr=self.hparams['lr'])
+    def configure_optimizers(self) -> dict:
+        optimizer = torch.optim.Adam(params=self.parameters(), lr=self.hparams['lr'])
+        scheduler = ReduceLROnPlateau(optimizer=optimizer)
+        return {
+            'optimizer': optimizer,
+            'lr_scheduler': scheduler,
+            'monitor': "Train/Average Loss"
+        }
 
     def predict(self, X: torch.Tensor) -> torch.Tensor:
         """

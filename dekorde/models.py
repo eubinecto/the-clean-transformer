@@ -162,10 +162,10 @@ class EncoderLayer(torch.nn.Module):
         """
         src_hidden, src_mask = inputs
         src_hidden_ = self.mhsa_layer(Q=src_hidden, K=src_hidden, V=src_hidden,
-                                      key_mask=src_mask)
-        src_hidden_ = self.layer_norm_1(src_hidden_) + src_hidden_
-        src_hidden_ = self.ffn(src_hidden_)
-        src_hidden = self.layer_norm_2(src_hidden_) + src_hidden_  # src_hidden is now updated
+                                      key_mask=src_mask) + src_hidden
+        src_hidden_ = self.layer_norm_1(src_hidden_)
+        src_hidden_ = self.ffn(src_hidden_) + src_hidden_
+        src_hidden = self.layer_norm_2(src_hidden_)  # src_hidden is now updated
         return src_hidden, src_mask
 
 
@@ -209,17 +209,17 @@ class DecoderLayer(torch.nn.Module):
         src_hidden, tgt_hidden, src_mask, tgt_mask = inputs
         # --- contextualise
         tgt_hidden_ = self.masked_mhsa_layer(Q=tgt_hidden, K=tgt_hidden, V=tgt_hidden,
-                                             key_mask=tgt_mask)
-        tgt_hidden_ = self.layer_norm_1(tgt_hidden_) + tgt_hidden_
+                                             key_mask=tgt_mask) + tgt_hidden
+        tgt_hidden_ = self.layer_norm_1(tgt_hidden_)
         # query = target
         # key = source
         # value = weighted average of source
         tgt_hidden_ = self.mheda_layer(Q=tgt_hidden_, K=src_hidden, V=src_hidden,
-                                       key_mask=src_mask)
-        tgt_hidden_ = self.layer_norm_2(tgt_hidden_) + tgt_hidden_
+                                       key_mask=src_mask) + tgt_hidden_
+        tgt_hidden_ = self.layer_norm_2(tgt_hidden_)
 
-        tgt_hidden_ = self.ffn(tgt_hidden_)
-        tgt_hidden_ = self.layer_norm_3(tgt_hidden_) + tgt_hidden_  # tgt_hidden_ updated
+        tgt_hidden_ = self.ffn(tgt_hidden_) + tgt_hidden_
+        tgt_hidden_ = self.layer_norm_3(tgt_hidden_)  # tgt_hidden_ updated
 
         # what exactly are you updating? aren't you updating the source hidden?
         return src_hidden, tgt_hidden_, src_mask, tgt_mask

@@ -22,6 +22,7 @@ def main():
     args = parser.parse_args()
     config = fetch_config()['train'][args.ver]
     config.update(vars(args))
+    torch.nn.Transformer
     with wandb.init(entity="eubinecto", project="dekorde", config=config) as run:
         # --- fetch a pre-trained tokenizer from wandb -- #
         tokenizer = fetch_tokenizer(run, config['tokenizer'])

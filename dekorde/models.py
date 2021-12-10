@@ -66,7 +66,8 @@ class Transformer(LightningModule):
         # cross entropy of 3D input? - https://stackoverflow.com/a/63650146
         logits = torch.einsum("nlh,vh->nvl", tgt_hidden, cls)  # (N, |V|, L)
         # (N, |V|, L), (N, L) -> (N, 1) -> (1)
-        loss = F.cross_entropy(logits, y, ignore_index=self.hparams['pad_token_id']).sum()
+        # the lengths are different  -> pad should not be ignored
+        loss = F.cross_entropy(logits, y).sum()
         return {
             'loss': loss
         }

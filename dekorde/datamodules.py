@@ -19,8 +19,8 @@ os.environ["TOKENIZERS_PARALLELISM"] = "true"
 
 class DekordeDataset(Dataset):
     def __init__(self, X: torch.Tensor, y: torch.Tensor):
-        self.X = X
-        self.y = y
+        self.X = lazy(X, batch=0)
+        self.y = lazy(y, batch=0)
 
     def __getitem__(self, index: int) -> Tuple[torch.Tensor, torch.Tensor]:
         return self.X[index], self.y[index]
@@ -37,17 +37,13 @@ class Kor2EngDataModule(LightningDataModule):
         self.run = run
         self.config = config
         self.tokenizer = tokenizer
-        # --- to be filled --- #
-        self.train: Optional[Dataset] = None
-        self.val: Optional[Dataset] = None
-        self.test: Optional[Dataset] = None
+        # --- to be downloaded --- #
+        self.kor2eng_train: Optional[List[Tuple[str, str]]] = None
+        self.kor2eng_val: Optional[List[Tuple[str, str]]] = None
+        self.kor2eng_test: Optional[List[Tuple[str, str]]] = None
 
     def prepare_data(self) -> None:
-        kor2eng_train, kor2eng_val, kor2eng_test = fetch_kor2eng()
-        # split the dataset here
-        self.train = self.build_dataset(kor2eng_train)
-        self.val = self.build_dataset(kor2eng_val)
-        self.test = self.build_dataset(kor2eng_test)
+        self.kor2eng_train, self.kor2eng_val, self.kor2eng_test = fetch_kor2eng()
 
     def build_dataset(self, src2tgt: List[Tuple[str, str]]) -> Dataset:
         srcs = [src for src, _ in src2tgt]
@@ -58,15 +54,15 @@ class Kor2EngDataModule(LightningDataModule):
         return DekordeDataset(X, y)  # noqa
 
     def train_dataloader(self) -> DataLoader:
-        return DataLoader(self.train, batch_size=self.config['batch_size'],
+        return DataLoader(self.build_dataset(self.kor2eng_train), batch_size=self.config['batch_size'],
                           shuffle=self.config['shuffle'], num_workers=self.config['num_workers'])
 
     def val_dataloader(self) -> DataLoader:
-        return DataLoader(self.val, batch_size=self.config['batch_size'],
+        return DataLoader(self.build_dataset(self.kor2eng_val), batch_size=self.config['batch_size'],
                           shuffle=False, num_workers=self.config['num_workers'])
 
     def test_dataloader(self) -> DataLoader:
-        return DataLoader(self.test, batch_size=self.config['batch_size'],
+        return DataLoader(self.build_dataset(self.kor2eng_test), batch_size=self.config['batch_size'],
                           shuffle=False, num_workers=self.config['num_workers'])
 
     # ignore this

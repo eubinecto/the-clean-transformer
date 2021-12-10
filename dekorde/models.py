@@ -1,5 +1,6 @@
 import torch
 import numpy as np
+from abc import ABC
 from argparse import Namespace
 from typing import Tuple, List
 from pytorch_lightning import LightningModule
@@ -9,7 +10,7 @@ from torch.optim import lr_scheduler
 from tqdm import tqdm
 
 
-class Transformer(LightningModule):
+class Transformer(LightningModule, ABC):
 
     def __init__(self, hidden_size: int, ffn_size: int,
                  vocab_size: int, max_length: int,
@@ -138,19 +139,6 @@ class Transformer(LightningModule):
             tgt_ids[:, time] = preds
             tgt_mask[:, time] = 1
         return tgt_ids
-
-    # just ignore these
-    def train_dataloader(self):
-        pass
-
-    def test_dataloader(self):
-        pass
-
-    def val_dataloader(self):
-        pass
-
-    def predict_dataloader(self):
-        pass
 
 
 class FeedForward(torch.nn.Module):

@@ -60,12 +60,7 @@ class Transformer(LightningModule, ABC):
             if param.dim() > 1:
                 torch.nn.init.xavier_uniform_(param)
 
-    def training_step(self, batch: Tuple[torch.Tensor, torch.Tensor], *args, **kwargs) -> dict:
-        """
-        A function for computing the loss for this batch.
-        :return: a scalar tensor
-        """
-        X, y = batch
+    def step(self, X: torch.Tensor, y: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor]:
         src_ids, src_mask = X[:, 0, 0], X[:, 0, 1]
         tgt_ids, tgt_mask = X[:, 1, 0], X[:, 1, 1]
         tgt_hidden = self.forward(src_ids, tgt_ids, src_mask, tgt_mask)  # ... -> (N, L, H)
@@ -77,36 +72,42 @@ class Transformer(LightningModule, ABC):
         # (N, |V|, L), (N, L) -> (N, 1) -> (1)
         # the lengths are different  -> pad should not be ignored
         loss = F.cross_entropy(logits, y, ignore_index=self.hparams['pad_token_id']).sum()
-        return {
-            'loss': loss,
-            'logits': logits.detach()
-        }
+        return loss, logits
 
-    def on_train_batch_end(self, outputs: dict, batch: Tuple[torch.Tensor, torch.Tensor], *args, **kwargs) -> None:
-        # watch the loss for this batch
-        _, y = batch
-        self.log("Train/Loss", outputs['loss'])
-        self.acc_train.update(preds=outputs['logits'], target=y)
+    def training_step(self, batch: Tuple[torch.Tensor, torch.Tensor], *args, **kwargs) -> dict:
+        """
+        A function for computing the loss for this batch.
+        :return: a scalar tensor
+        """
+        X, y = batch
+        loss, logits = self.step(X, y)
+        self.log("Train/Loss", loss)
+        self.acc_train.update(logits.detach(), target=y.detach())
+        return {
+            'loss': loss
+        }
 
     def training_epoch_end(self, outputs: List[dict]) -> None:
         # to see an average performance over the batches in this specific epoch
-        avg_loss = torch.stack([output['loss'] for output in outputs]).mean()
+        # why detach? ->  https://discuss.pytorch.org/t/cuda-out-of-memory-during-training/85014/2
+        avg_loss = torch.stack([output['loss'].detach() for output in outputs]).mean()
         self.log("Train/Average Loss", avg_loss)
         self.log("Train/Accuracy", self.acc_train.compute())
         self.acc_train.reset()
 
     def validation_step(self, batch: Tuple[torch.Tensor, torch.Tensor], *args, **kwargs) -> dict:
-        return self.training_step(batch)
-
-    def on_validation_batch_end(self, outputs: dict, batch: Tuple[torch.Tensor, torch.Tensor], *args, **kwargs) -> None:
-        # watch the loss for this batch
-        _, y = batch
-        self.log("Validation/Loss", outputs['loss'])
-        self.acc_val.update(preds=outputs['logits'], target=y)
+        X, y = batch
+        loss, logits = self.step(X, y)
+        self.log("Validation/Loss", loss)
+        self.acc_val.update(logits.detach(), target=y.detach())
+        return {
+            'loss': loss
+        }
 
     def validation_epoch_end(self, outputs: List[dict]) -> None:
         # to see an average performance over the batches in this specific epoch
-        avg_loss = torch.stack([output['loss'] for output in outputs]).mean()
+        # why detach? ->  https://discuss.pytorch.org/t/cuda-out-of-memory-during-training/85014/2
+        avg_loss = torch.stack([output['loss'].detach() for output in outputs]).mean()
         self.log("Validation/Average Loss", avg_loss)
         self.log("Validation/Accuracy", self.acc_val.compute())
         self.acc_val.reset()

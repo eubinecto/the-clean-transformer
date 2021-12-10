@@ -37,7 +37,7 @@ class TrainInputsBuilder(DataBuilder):
         ])
         # the target sentences, which are to be fed as the inputs to the decoder
         input_ids_tgt, attention_mask_tgt = self.encode([
-            # starts with bos, but does not end with eos (left-shifted)
+            # starts with bos, ends with  eos.
             self.tokenizer.bos_token + " " + sent +  " " + self.tokenizer.eos_token  # noqa
             for sent in tgts
         ])

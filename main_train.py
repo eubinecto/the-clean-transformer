@@ -8,7 +8,7 @@ from pytorch_lightning import Trainer
 from dekorde.models import Transformer
 from dekorde.fetchers import fetch_tokenizer, fetch_config
 from dekorde.paths import ROOT_DIR
-from dekorde.datamodules import Kor2EngDataModule
+from dekorde.datamodules import Kor2EngDataModule, Kor2EngSmallDataModule
 
 
 def main():
@@ -17,6 +17,7 @@ def main():
     parser.add_argument("--num_workers", type=int, default=4)
     parser.add_argument("--log_every_n_steps", type=int, default=1)
     parser.add_argument("--fast_dev_run", action="store_true", default=False)
+    parser.add_argument("--overfit_batches", type=int, default=0)
     args = parser.parse_args()
     config = fetch_config()['train'][args.ver]
     config.update(vars(args))
@@ -34,9 +35,14 @@ def main():
                                   config['depth'],
                                   config['dropout'],
                                   config['lr'])
-        # --- instantiate the data to train the model with --- #
-        datamodule = Kor2EngDataModule(run, config, tokenizer)
-        # --- prepare the logger (wandb) and the trainer to use --- #
+        # --- choose the data --- #
+        if config['data'] == Kor2EngDataModule.name:
+            datamodule = Kor2EngDataModule(config, tokenizer)
+        elif config['data'] == Kor2EngSmallDataModule.name:
+            datamodule = Kor2EngSmallDataModule(config, tokenizer)
+        else:
+            raise ValueError(f"Invalid data: {config['data']}")
+        # --- prepare a logger (wandb) and a trainer to use --- #
         logger = WandbLogger(log_model=False)
         lr_monitor = LearningRateMonitor(logging_interval='epoch')
         trainer = Trainer(fast_dev_run=config['fast_dev_run'],

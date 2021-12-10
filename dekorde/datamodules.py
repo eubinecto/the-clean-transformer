@@ -1,16 +1,15 @@
 """
 Defining the dataset & the datamodule to be used for training
 """
+import os
 import torch
-from koila import lazy
 from typing import Tuple, Optional, List
 from tokenizers import Tokenizer
+from koila import lazy
 from torch.utils.data import Dataset, DataLoader
 from pytorch_lightning import LightningDataModule
-from wandb.sdk.wandb_run import Run
 from dekorde.builders import TrainInputsBuilder, LabelsBuilder
 from dekorde.fetchers import fetch_kor2eng
-import os
 
 # to suppress warnings - we just allow parallelism
 # https://github.com/kakaobrain/pororo/issues/69#issuecomment-927564132
@@ -31,10 +30,10 @@ class DekordeDataset(Dataset):
 
 
 class Kor2EngDataModule(LightningDataModule):
+    name: str = "kor2eng"
 
-    def __init__(self, run: Run, config: dict, tokenizer: Tokenizer):
+    def __init__(self, config: dict, tokenizer: Tokenizer):
         super().__init__()
-        self.run = run
         self.config = config
         self.tokenizer = tokenizer
         # --- to be downloaded --- #
@@ -68,3 +67,17 @@ class Kor2EngDataModule(LightningDataModule):
     # ignore this
     def predict_dataloader(self):
         pass
+
+
+class Kor2EngSmallDataModule(Kor2EngDataModule):
+    """
+    Just the first 50 sentences are prepared.
+    We use this just for testing things out
+    """
+    name: str = "kor2eng_small"
+
+    def prepare_data(self) -> None:
+        kor2eng_train, kor2eng_val, kor2eng_test = fetch_kor2eng()
+        self.kor2eng_train = kor2eng_train[:50]
+        self.kor2eng_val = kor2eng_val[:50]
+        self.kor2eng_test = kor2eng_test[:50]

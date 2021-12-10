@@ -5,7 +5,7 @@ train:
     heads: 8
     depth: 3
     max_epochs: 2
-    max_length: 60
+    max_length: 150
     batch_size: 64
     val_ratio: 0.15
     test_ratio: 0.15
@@ -14,14 +14,12 @@ train:
     dropout: 0.0001
     seed: 410
     shuffle: true
-    data_type: jeju2seoul
-    data_ver: v0
   overfit:
     hidden_size: 32
     heads: 8
     depth: 3
     max_epochs: 50
-    max_length: 60
+    max_length: 150
     batch_size: 128
     val_ratio: 0.15
     test_ratio: 0.15
@@ -31,12 +29,10 @@ train:
     seed: 410
     # shuffle the training set
     shuffle: true
-    data_type: jeju2seoul
-    data_ver: v0
 
 # --- config for building a tokenizer --- #
 build:
-  vocab_size: 3000
+  vocab_size: 20000
   pad: "[PAD]"
   pad_id: 0
   unk: "[UNK]"

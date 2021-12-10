@@ -2,14 +2,13 @@ import os
 import torch
 import wandb
 import argparse
+from pytorch_lightning.callbacks import LearningRateMonitor
 from pytorch_lightning.loggers import WandbLogger
 from pytorch_lightning import Trainer
-from tqdm import tqdm
-
 from dekorde.models import Transformer
 from dekorde.fetchers import fetch_tokenizer, fetch_config
 from dekorde.paths import ROOT_DIR
-from dekorde.datamodules import Jeju2SeoulDataModule
+from dekorde.datamodules import Kor2EngDataModule
 
 
 def main():
@@ -36,14 +35,16 @@ def main():
                                   config['dropout'],
                                   config['lr'])
         # --- instantiate the data to train the model with --- #
-        datamodule = Jeju2SeoulDataModule(run, config, tokenizer)
+        datamodule = Kor2EngDataModule(run, config, tokenizer)
         # --- prepare the logger (wandb) and the trainer to use --- #
         logger = WandbLogger(log_model=False)
+        lr_monitor = LearningRateMonitor(logging_interval='epoch')
         trainer = Trainer(fast_dev_run=config['fast_dev_run'],
                           overfit_batches=config['overfit_batches'],
                           max_epochs=config['max_epochs'],
                           log_every_n_steps=config['log_every_n_steps'],
                           gpus=torch.cuda.device_count(),
+                          callbacks=[lr_monitor],
                           enable_checkpointing=False,
                           logger=logger)
         # --- start training --- #

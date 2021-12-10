@@ -5,19 +5,24 @@ Korpora 에서도 fetch 라고 표현한다: https://github.com/ko-nlp/Korpora
 import yaml
 from os import path
 from typing import Tuple, List
+from Korpora import KoreanParallelKOENNewsKorpus
+from Korpora.korpora import Korpus
 from tokenizers import Tokenizer
 from wandb.sdk.wandb_run import Run
-from dekorde.paths import CONFIG_YAML
+from dekorde.paths import CONFIG_YAML, KORPORA_DIR
 from dekorde.models import Transformer
 from pytorch_lightning import LightningModule
 
 
-# --- fetchers for fetching artifacts --- #
-def fetch_jeju2seoul(run: Run, ver: str = "latest") -> List[Tuple[str, str]]:
-    table = run.use_artifact(f"seoul2jeju:{ver}") \
-               .get("seoul2jeju")
-    seoul2jeju = [(row[1], row[0]) for row in table.data]
-    return seoul2jeju
+def fetch_kor2eng() -> Tuple[List[Tuple[str, str]],
+                             List[Tuple[str, str]],
+                             List[Tuple[str, str]]]:
+    # download the data
+    korpus = KoreanParallelKOENNewsKorpus(root_dir=KORPORA_DIR)
+    kor2eng_train = list(zip(korpus.train.texts, korpus.train.pairs))
+    kor2eng_val = list(zip(korpus.dev.texts, korpus.dev.pairs))
+    kor2eng_test = list(zip(korpus.test.texts, korpus.test.pairs))
+    return kor2eng_train, kor2eng_val, kor2eng_test
 
 
 def fetch_tokenizer(run: Run, ver: str = "latest") -> Tokenizer:

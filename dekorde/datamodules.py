@@ -2,14 +2,13 @@
 Defining the dataset & the datamodule to be used for training
 """
 import torch
-from typing import Tuple, Optional
+from typing import Tuple, Optional, List
 from tokenizers import Tokenizer
 from torch.utils.data import Dataset, DataLoader
-from torch.utils.data.dataset import random_split, Subset
 from pytorch_lightning import LightningDataModule
 from wandb.sdk.wandb_run import Run
 from dekorde.builders import TrainInputsBuilder, LabelsBuilder
-from dekorde.fetchers import fetch_jeju2seoul
+from dekorde.fetchers import fetch_kor2eng
 import os
 
 # to suppress warnings - we just allow parallelism
@@ -30,7 +29,7 @@ class DekordeDataset(Dataset):
         return N
 
 
-class Jeju2SeoulDataModule(LightningDataModule):
+class Kor2EngDataModule(LightningDataModule):
 
     def __init__(self, run: Run, config: dict, tokenizer: Tokenizer):
         super().__init__()
@@ -38,26 +37,23 @@ class Jeju2SeoulDataModule(LightningDataModule):
         self.config = config
         self.tokenizer = tokenizer
         # --- to be filled --- #
-        self.train: Optional[Subset] = None
-        self.val: Optional[Subset] = None
-        self.test: Optional[Subset] = None
+        self.train: Optional[Dataset] = None
+        self.val: Optional[Dataset] = None
+        self.test: Optional[Dataset] = None
 
     def prepare_data(self) -> None:
-        jeju2seoul = fetch_jeju2seoul(self.run)
-        jejus = [jeju for jeju, _ in jeju2seoul]
-        seouls = [seoul for _, seoul in jeju2seoul]
-        # build the tensors here
-        X = TrainInputsBuilder(self.tokenizer, self.config['max_length'])(srcs=jejus, tgts=seouls)  # (N, L)
-        y = LabelsBuilder(self.tokenizer, self.config['max_length'])(tgts=seouls)  # (N, L)
-        # build the dataset here
-        dataset = DekordeDataset(X, y)
-        val_size = int(len(dataset) * self.config["val_ratio"])
-        test_size = int(len(dataset) * self.config["test_ratio"])
-        train_size = len(dataset) - val_size - test_size
+        kor2eng_train, kor2eng_val, kor2eng_test = fetch_kor2eng()
         # split the dataset here
-        self.train, self.val, self.test = \
-            random_split(dataset, lengths=(train_size, val_size, test_size),
-                         generator=torch.Generator().manual_seed(self.config['seed']))
+        self.train = self.build_dataset(kor2eng_train)
+        self.val = self.build_dataset(kor2eng_val)
+        self.test = self.build_dataset(kor2eng_test)
+
+    def build_dataset(self, src2tgt: List[Tuple[str, str]]) -> Dataset:
+        srcs = [src for src, _ in src2tgt]
+        tgts = [tgt for _, tgt in src2tgt]
+        X = TrainInputsBuilder(self.tokenizer, self.config['max_length'])(srcs=srcs, tgts=tgts)  # (N, L)
+        y = LabelsBuilder(self.tokenizer, self.config['max_length'])(tgts=tgts)  # (N, L)
+        return DekordeDataset(X, y)
 
     def train_dataloader(self) -> DataLoader:
         return DataLoader(self.train, batch_size=self.config['batch_size'],
@@ -73,21 +69,4 @@ class Jeju2SeoulDataModule(LightningDataModule):
 
     # ignore this
     def predict_dataloader(self):
-        pass
-
-
-# --- add more datamodule as you wish --- #
-class Kor2EngDataModule(LightningDataModule):
-
-    def train_dataloader(self) -> DataLoader:
-        pass
-
-    def test_dataloader(self) -> DataLoader:
-        pass
-
-    def val_dataloader(self) -> DataLoader:
-        pass
-
-    # ignore this
-    def predict_dataloader(self) -> DataLoader:
         pass

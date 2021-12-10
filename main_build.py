@@ -17,7 +17,7 @@ from tokenizers.normalizers import Lowercase
 from tokenizers.pre_tokenizers import Whitespace, Digits, Punctuation
 from tokenizers.trainers import BpeTrainer, WordPieceTrainer
 from dekorde.paths import ROOT_DIR
-from dekorde.fetchers import fetch_config, fetch_jeju2seoul
+from dekorde.fetchers import fetch_config, fetch_kor2eng
 
 
 def main():
@@ -41,9 +41,14 @@ def main():
     tokenizer.normalizer = normalizers.Sequence([Lowercase()])  # noqa
     # --- prepare the data --- #
     with wandb.init(entity="eubinecto", project="dekorde", config=config) as run:
-        jeju2seoul = fetch_jeju2seoul(run)
+        kor2eng_train, kor2eng_val, kor2eng_test = fetch_kor2eng()
         # chaining two generators;  https://stackoverflow.com/a/3211047
-        iterator = chain((jeju for jeju, _ in jeju2seoul), (seoul for _, seoul in jeju2seoul))
+        iterator = chain((kor for kor, _ in kor2eng_train),
+                         (eng for _, eng in kor2eng_train),
+                         (kor for kor, _ in kor2eng_val),
+                         (eng for _, eng in kor2eng_val),
+                         (kor for kor, _ in kor2eng_test),
+                         (eng for _, eng in kor2eng_test))
         # --- train the tokenizer --- #
         tokenizer.train_from_iterator(iterator, trainer=trainer)
         # --- then save it --- #

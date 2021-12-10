@@ -78,4 +78,4 @@ class Kor2EngSmallDataModule(Kor2EngDataModule):
 
     def prepare_data(self) -> None:
         kor2eng_train, self.kor2eng_val, self.kor2eng_test = fetch_kor2eng()
-        self.kor2eng_train = kor2eng_train[:self.config['batch_size'] * 3]
+        self.kor2eng_train = kor2eng_train[:256]

@@ -81,11 +81,13 @@ class Transformer(LightningModule, ABC):
         """
         X, y = batch
         loss, logits = self.step(X, y)
-        self.log("Train/Loss", loss)
         self.acc_train.update(logits.detach(), target=y.detach())
         return {
             'loss': loss
         }
+
+    def on_train_batch_end(self, outputs: dict,  *args, **kwargs):
+        self.log("Train/Loss", outputs['loss'].detach())
 
     def training_epoch_end(self, outputs: List[dict]) -> None:
         # to see an average performance over the batches in this specific epoch
@@ -98,11 +100,13 @@ class Transformer(LightningModule, ABC):
     def validation_step(self, batch: Tuple[torch.Tensor, torch.Tensor], *args, **kwargs) -> dict:
         X, y = batch
         loss, logits = self.step(X, y)
-        self.log("Validation/Loss", loss)
         self.acc_val.update(logits.detach(), target=y.detach())
         return {
             'loss': loss
         }
+
+    def on_validation_batch_end(self, outputs: dict, *args, **kwargs):
+        self.log("Validation/Loss", outputs['loss'].detach())
 
     def validation_epoch_end(self, outputs: List[dict]) -> None:
         # to see an average performance over the batches in this specific epoch

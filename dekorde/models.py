@@ -18,6 +18,7 @@ class Transformer(LightningModule, ABC):
                  dropout: float, lr: float):
         super().__init__()
         self.save_hyperparameters(Namespace(hidden_size=hidden_size,
+                                            ffn_size=ffn_size,
                                             vocab_size=vocab_size,
                                             max_length=max_length,
                                             pad_token_id=pad_token_id,
@@ -87,12 +88,12 @@ class Transformer(LightningModule, ABC):
         }
 
     def on_train_batch_end(self, outputs: dict,  *args, **kwargs):
-        self.log("Train/Loss", outputs['loss'].detach())
+        self.log("Train/Loss", outputs['loss'])
 
     def training_epoch_end(self, outputs: List[dict]) -> None:
         # to see an average performance over the batches in this specific epoch
         # why detach? ->  https://discuss.pytorch.org/t/cuda-out-of-memory-during-training/85014/2
-        avg_loss = torch.stack([output['loss'].detach() for output in outputs]).mean()
+        avg_loss = torch.stack([output['loss'] for output in outputs]).mean()
         self.log("Train/Average Loss", avg_loss)
         self.log("Train/Accuracy", self.acc_train.compute())
         self.acc_train.reset()
@@ -106,12 +107,12 @@ class Transformer(LightningModule, ABC):
         }
 
     def on_validation_batch_end(self, outputs: dict, *args, **kwargs):
-        self.log("Validation/Loss", outputs['loss'].detach())
+        self.log("Validation/Loss", outputs['loss'])
 
     def validation_epoch_end(self, outputs: List[dict]) -> None:
         # to see an average performance over the batches in this specific epoch
         # why detach? ->  https://discuss.pytorch.org/t/cuda-out-of-memory-during-training/85014/2
-        avg_loss = torch.stack([output['loss'].detach() for output in outputs]).mean()
+        avg_loss = torch.stack([output['loss'] for output in outputs]).mean()
         self.log("Validation/Average Loss", avg_loss)
         self.log("Validation/Accuracy", self.acc_val.compute())
         self.acc_val.reset()

@@ -3,8 +3,9 @@ import numpy as np
 from argparse import Namespace
 from typing import Tuple, List
 from pytorch_lightning import LightningModule
+from torchmetrics import Accuracy
 from torch.nn import functional as F
-from torch.optim.lr_scheduler import ReduceLROnPlateau
+from torch.optim import lr_scheduler
 from tqdm import tqdm
 
 
@@ -26,6 +27,11 @@ class Transformer(LightningModule):
         self.pos_embeddings = torch.nn.Embedding(num_embeddings=max_length, embedding_dim=hidden_size)
         self.encoder = Encoder(hidden_size, max_length, heads, depth, dropout)  # the encoder stack
         self.decoder = Decoder(hidden_size, max_length, heads, depth, dropout)  # the decoder stack
+        # --- metrics --- #
+        # we are supposed to use bleu, but let's use accuracy as the metrics to keep things simple
+        self.acc_train = Accuracy()
+        self.acc_val = Accuracy()
+        self.acc_test = Accuracy()
         # --- we register any constant tensors to the buffer instead of using to(device) --- #
         self.register_buffer("positions", torch.arange(max_length))  # (L)
 
@@ -69,29 +75,46 @@ class Transformer(LightningModule):
         # the lengths are different  -> pad should not be ignored
         loss = F.cross_entropy(logits, y, ignore_index=self.hparams['pad_token_id']).sum()
         return {
-            'loss': loss
+            'loss': loss,
+            'logits': logits.detach()
         }
+
+    def on_train_batch_end(self, outputs: dict, batch: Tuple[torch.Tensor, torch.Tensor], *args, **kwargs) -> None:
+        # watch the loss for this batch
+        _, y = batch
+        self.log("Train/Loss", outputs['loss'])
+        self.acc_train.update(preds=outputs['logits'], target=y)
 
     def training_epoch_end(self, outputs: List[dict]) -> None:
         # to see an average performance over the batches in this specific epoch
         avg_loss = torch.stack([output['loss'] for output in outputs]).mean()
         self.log("Train/Average Loss", avg_loss)
+        self.log("Train/Accuracy", self.acc_train.compute())
 
     def validation_step(self, batch: Tuple[torch.Tensor, torch.Tensor], *args, **kwargs) -> dict:
         return self.training_step(batch)
+
+    def on_validation_batch_end(self, outputs: dict, batch: Tuple[torch.Tensor, torch.Tensor], *args, **kwargs) -> None:
+        # watch the loss for this batch
+        _, y = batch
+        self.log("Validation/Loss", outputs['loss'])
+        self.acc_val.update(preds=outputs['logits'], target=y)
 
     def validation_epoch_end(self, outputs: List[dict]) -> None:
         # to see an average performance over the batches in this specific epoch
         avg_loss = torch.stack([output['loss'] for output in outputs]).mean()
         self.log("Validation/Average Loss", avg_loss)
+        self.log("Validation/Accuracy", self.acc_val.compute())
 
     def configure_optimizers(self) -> dict:
-        optimizer = torch.optim.Adam(params=self.parameters(), lr=self.hparams['lr'])
-        scheduler = ReduceLROnPlateau(optimizer=optimizer)
+        optimizer = torch.optim.Adam(params=self.parameters(), lr=self.hparams['lr'],
+                                     betas=(0.9, 0.98), eps=1e-9)
+        # what schedulers to use? : https://gaussian37.github.io/dl-pytorch-lr_scheduler/
+        scheduler = lr_scheduler.ReduceLROnPlateau(optimizer, mode="min", patience=1, verbose=True)
         return {
             'optimizer': optimizer,
             'lr_scheduler': scheduler,
-            'monitor': "Train/Average Loss"
+            'monitor': "Train/Average Loss"  # better monitor the accuracy
         }
 
     def predict(self, X: torch.Tensor) -> torch.Tensor:

@@ -90,6 +90,7 @@ class Transformer(LightningModule):
         avg_loss = torch.stack([output['loss'] for output in outputs]).mean()
         self.log("Train/Average Loss", avg_loss)
         self.log("Train/Accuracy", self.acc_train.compute())
+        self.acc_train.reset()
 
     def validation_step(self, batch: Tuple[torch.Tensor, torch.Tensor], *args, **kwargs) -> dict:
         return self.training_step(batch)
@@ -105,6 +106,7 @@ class Transformer(LightningModule):
         avg_loss = torch.stack([output['loss'] for output in outputs]).mean()
         self.log("Validation/Average Loss", avg_loss)
         self.log("Validation/Accuracy", self.acc_val.compute())
+        self.acc_val.reset()
 
     def configure_optimizers(self) -> dict:
         optimizer = torch.optim.Adam(params=self.parameters(), lr=self.hparams['lr'],

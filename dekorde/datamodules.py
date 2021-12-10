@@ -55,8 +55,6 @@ class Kor2EngDataModule(LightningDataModule):
         X = TrainInputsBuilder(self.tokenizer, self.config['max_length'])(srcs=srcs, tgts=tgts)  # (N, L)
         y = LabelsBuilder(self.tokenizer, self.config['max_length'])(tgts=tgts)  # (N, L)
         # to save gpu memory
-        X = lazy(X, batch=0)
-        y = lazy(y, batch=0)
         return DekordeDataset(X, y)  # noqa
 
     def train_dataloader(self) -> DataLoader:

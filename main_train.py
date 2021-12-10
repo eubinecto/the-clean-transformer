@@ -18,11 +18,11 @@ def main():
     parser.add_argument("--num_workers", type=int, default=4)
     parser.add_argument("--log_every_n_steps", type=int, default=1)
     parser.add_argument("--fast_dev_run", action="store_true", default=False)
-    parser.add_argument("--overfit_batches", type=int, default=None)
+    parser.add_argument("--overfit_batches", type=int, default=0)
     args = parser.parse_args()
     config = fetch_config()['train'][args.ver]
     config.update(vars(args))
-    torch.nn.Transformer
+
     with wandb.init(entity="eubinecto", project="dekorde", config=config) as run:
         # --- fetch a pre-trained tokenizer from wandb -- #
         tokenizer = fetch_tokenizer(run, config['tokenizer'])

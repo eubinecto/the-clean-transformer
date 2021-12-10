@@ -27,6 +27,7 @@ def main():
         tokenizer = fetch_tokenizer(run, config['tokenizer'])
         # --- instantiate the model to train --- #
         transformer = Transformer(config['hidden_size'],
+                                  config['ffn_size'],
                                   tokenizer.get_vocab_size(),  # vocab_size
                                   config['max_length'],
                                   tokenizer.pad_token_id,  # noqa

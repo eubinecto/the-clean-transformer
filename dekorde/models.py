@@ -11,8 +11,10 @@ from tqdm import tqdm
 
 class Transformer(LightningModule):
 
-    def __init__(self, hidden_size: int, vocab_size: int,
-                 max_length: int, pad_token_id: int, heads: int, depth: int, dropout: float, lr: float):
+    def __init__(self, hidden_size: int, ffn_size: int,
+                 vocab_size: int, max_length: int,
+                 pad_token_id: int, heads: int, depth: int,
+                 dropout: float, lr: float):
         super().__init__()
         self.save_hyperparameters(Namespace(hidden_size=hidden_size,
                                             vocab_size=vocab_size,
@@ -25,8 +27,8 @@ class Transformer(LightningModule):
         # --- layers to optimise --- #
         self.token_embeddings = torch.nn.Embedding(num_embeddings=vocab_size, embedding_dim=hidden_size)
         self.pos_embeddings = torch.nn.Embedding(num_embeddings=max_length, embedding_dim=hidden_size)
-        self.encoder = Encoder(hidden_size, max_length, heads, depth, dropout)  # the encoder stack
-        self.decoder = Decoder(hidden_size, max_length, heads, depth, dropout)  # the decoder stack
+        self.encoder = Encoder(hidden_size, ffn_size, max_length, heads, depth, dropout)  # the encoder stack
+        self.decoder = Decoder(hidden_size, ffn_size, max_length, heads, depth, dropout)  # the decoder stack
         # --- metrics --- #
         # we are supposed to use bleu, but let's use accuracy as the metrics to keep things simple
         self.acc_train = Accuracy(ignore_index=pad_token_id)
@@ -112,7 +114,7 @@ class Transformer(LightningModule):
         optimizer = torch.optim.Adam(params=self.parameters(), lr=self.hparams['lr'],
                                      betas=(0.9, 0.98), eps=1e-9)
         # what schedulers to use? : https://gaussian37.github.io/dl-pytorch-lr_scheduler/
-        scheduler = lr_scheduler.ReduceLROnPlateau(optimizer, mode="min", patience=1, verbose=True)
+        scheduler = lr_scheduler.ReduceLROnPlateau(optimizer, mode="min", patience=10, verbose=True)
         return {
             'optimizer': optimizer,
             'lr_scheduler': scheduler,
@@ -155,12 +157,12 @@ class FeedForward(torch.nn.Module):
     """
     position-wise feedforward network.
     """
-    def __init__(self, hidden_size: int, dropout: float):
+    def __init__(self, hidden_size: int, ffn_size: int, dropout: float):
         super().__init__()
         self.layers = torch.nn.Sequential(
-            torch.nn.Linear(hidden_size, 2048),
+            torch.nn.Linear(hidden_size, ffn_size),
             torch.nn.ReLU(),
-            torch.nn.Linear(2048, hidden_size),
+            torch.nn.Linear(ffn_size, hidden_size),
             torch.nn.Dropout(dropout)
         )
 
@@ -173,12 +175,12 @@ class FeedForward(torch.nn.Module):
 
 
 class EncoderLayer(torch.nn.Module):
-    def __init__(self, hidden_size: int, max_length: int, heads: int, dropout: float):
+    def __init__(self, hidden_size: int, ffn_size: int, max_length: int, heads: int, dropout: float):
         super().__init__()
         # any layers to optimise?
         self.mhsa_layer = MultiHeadAttentionLayer(hidden_size, max_length, heads, masked=False)
         self.layer_norm_1 = torch.nn.LayerNorm(hidden_size)
-        self.ffn = FeedForward(hidden_size, dropout)
+        self.ffn = FeedForward(hidden_size, ffn_size, dropout)
         self.layer_norm_2 = torch.nn.LayerNorm(hidden_size)
 
     def forward(self, inputs: Tuple[torch.Tensor, torch.Tensor]) -> Tuple[torch.Tensor, torch.Tensor]:
@@ -196,11 +198,11 @@ class EncoderLayer(torch.nn.Module):
 
 
 class Encoder(torch.nn.Module):
-    def __init__(self, hidden_size: int, max_length: int, heads: int, depth: int, dropout: float):
+    def __init__(self, hidden_size: int, ffn_size: int, max_length: int, heads: int, depth: int, dropout: float):
         super().__init__()
         # TODO: replace this with module list
         self.encoder_layers = torch.nn.Sequential(
-            *[EncoderLayer(hidden_size, max_length, heads, dropout) for _ in range(depth)]
+            *[EncoderLayer(hidden_size, ffn_size, max_length, heads, dropout) for _ in range(depth)]
         )
 
     def forward(self, src_embed: torch.Tensor, src_mask: torch.Tensor) -> torch.Tensor:
@@ -214,7 +216,7 @@ class Encoder(torch.nn.Module):
 
 
 class DecoderLayer(torch.nn.Module):
-    def __init__(self, hidden_size: int, max_length: int, heads: int, dropout: float):
+    def __init__(self, hidden_size: int, ffn_size: int, max_length: int, heads: int, dropout: float):
         super().__init__()
         # masked, multi-head self-attention layer.
         self.masked_mhsa_layer = MultiHeadAttentionLayer(hidden_size, max_length, heads, masked=True)
@@ -223,7 +225,7 @@ class DecoderLayer(torch.nn.Module):
         self.mheda_layer = MultiHeadAttentionLayer(hidden_size, max_length, heads, masked=False)
         self.layer_norm_2 = torch.nn.LayerNorm(hidden_size)
         # position-wise feed-forward network.
-        self.ffn = FeedForward(hidden_size, dropout)
+        self.ffn = FeedForward(hidden_size, ffn_size, dropout)
         self.layer_norm_3 = torch.nn.LayerNorm(hidden_size)
 
     def forward(self, inputs: Tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor])\
@@ -253,11 +255,11 @@ class DecoderLayer(torch.nn.Module):
 
 class Decoder(torch.nn.Module):
 
-    def __init__(self, hidden_size: int, max_length: int, heads: int, depth: int, dropout: float):
+    def __init__(self, hidden_size: int, ffn_size: int, max_length: int, heads: int, depth: int, dropout: float):
         super().__init__()
         # TODO: replace this with module list (No need to make things complicated)
         self.layers = torch.nn.Sequential(
-            *[DecoderLayer(hidden_size, max_length, heads, dropout) for _ in range(depth)]
+            *[DecoderLayer(hidden_size, ffn_size, max_length, heads, dropout) for _ in range(depth)]
         )
 
     def forward(self, src_hidden: torch.Tensor, tgt_embed: torch.Tensor,
@@ -298,7 +300,7 @@ class MultiHeadAttentionLayer(torch.nn.Module):
         self.W_v = torch.nn.Linear(hidden_size, hidden_size)
         self.W_o = torch.nn.Linear(hidden_size, hidden_size)  # for aggregating the multi-head outputs.
         # --- any constant tensors must be registered to a buffer --- #
-        self.register_buffer("subsequent_mask", torch.tril(torch.ones(size=(max_length, max_length)), diagonal=0).long())
+        self.register_buffer("subsequent_mask", torch.tril(torch.ones(size=(max_length, max_length)), diagonal=0).long())  # noqa
 
     def forward(self, Q: torch.Tensor, K: torch.Tensor, V: torch.Tensor, key_mask: torch.Tensor) -> torch.Tensor:
         """
@@ -389,7 +391,8 @@ class MultiHeadAttentionLayer(torch.nn.Module):
                        .expand(-1, self.heads, L, -1)
         # if masked, apply (logical-and it) the lookahead mask
         if self.masked:
+            # (N, L) -> (N, 1, 1, L) -> (N, heads, L, L)
             subsequent_mask_ = self.subsequent_mask.view(1, 1, L, L)\
-                                                 .expand(N, self.heads, -1, -1)
+                                                   .expand(N, self.heads, -1, -1)
             mask = torch.logical_and(mask, subsequent_mask_)
         return mask

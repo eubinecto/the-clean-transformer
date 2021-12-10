@@ -29,9 +29,9 @@ class Transformer(LightningModule):
         self.decoder = Decoder(hidden_size, max_length, heads, depth, dropout)  # the decoder stack
         # --- metrics --- #
         # we are supposed to use bleu, but let's use accuracy as the metrics to keep things simple
-        self.acc_train = Accuracy()
-        self.acc_val = Accuracy()
-        self.acc_test = Accuracy()
+        self.acc_train = Accuracy(ignore_index=pad_token_id)
+        self.acc_val = Accuracy(ignore_index=pad_token_id)
+        self.acc_test = Accuracy(ignore_index=pad_token_id)
         # --- we register any constant tensors to the buffer instead of using to(device) --- #
         self.register_buffer("positions", torch.arange(max_length))  # (L)
 

@@ -81,7 +81,7 @@ def main():
         if not config['fast_dev_run'] and trainer.current_epoch == config['max_epochs'] - 1:
             ckpt_path = os.path.join(ROOT_DIR, "transformer.ckpt")
             trainer.save_checkpoint(ckpt_path)
-            artifact = wandb.Artifact(name="transformer", type="model", metadata=config)
+            artifact = wandb.Artifact(name=config['model'], type="model", metadata=config)
             artifact.add_file(ckpt_path)
             run.log_artifact(artifact, aliases=["latest", config['ver']])
             os.remove(ckpt_path)  # make sure you remove it after you are done with uploading it

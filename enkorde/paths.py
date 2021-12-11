@@ -1,4 +1,3 @@
-import ntpath
 from pathlib import Path
 import os
 
@@ -14,4 +13,5 @@ CONFIG_YAML = os.path.join(ROOT_DIR, "config.yaml")
 
 # --- artifacts --- #
 TOKENIZER_DIR = os.path.join(ARTIFACTS_DIR, "tokenizer")
-TRANSFORMER_DIR = os.path.join(ARTIFACTS_DIR, "transformer")
+TRANSFORMER_TORCH_DIR = os.path.join(ARTIFACTS_DIR, "transformer_torch")
+TRANSFORMER_SCRATCH_DIR = os.path.join(ARTIFACTS_DIR, "transformer_scratch")

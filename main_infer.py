@@ -6,6 +6,7 @@ from enkorde.fetchers import fetch_config, fetch_tokenizer, fetch_transformer
 
 def main():
     parser = argparse.ArgumentParser()
+    parser.add_argument("--model", type=str, default="transformer_torch")
     parser.add_argument("--ver", type=str, default="overfit_small")
     parser.add_argument("--kor", type=str, default="양측은 또한 지구 온난화와 새 국제 형사 재판소를 포함한 광범위한 문제에 대해 견해 차이를 보여왔다.")
     args = parser.parse_args()
@@ -13,8 +14,8 @@ def main():
     config.update(vars(args))
     with wandb.init(entity="eubinecto", project="dekorde", config=config) as run:
         # fetch a pre-trained transformer with a pretrained tokenizer
-        transformer = fetch_transformer(run, config['ver'])
         tokenizer = fetch_tokenizer(run, config['tokenizer'])
+        transformer = fetch_transformer(run, config['model'], config['ver'])
         transformer.eval()
         kors = [config['kor']]
         X = InferInputsBuilder(tokenizer, config['max_length'])(srcs=kors)

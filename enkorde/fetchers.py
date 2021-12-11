@@ -8,8 +8,8 @@ from typing import Tuple, List
 from Korpora import KoreanParallelKOENNewsKorpus
 from tokenizers import Tokenizer
 from wandb.sdk.wandb_run import Run
-from enkorde.paths import CONFIG_YAML, KORPORA_DIR, TOKENIZER_DIR, TRANSFORMER_DIR
-from enkorde.models import Transformer
+from enkorde.paths import CONFIG_YAML, KORPORA_DIR, TOKENIZER_DIR, TRANSFORMER_TORCH_DIR, TRANSFORMER_SCRATCH_DIR
+from enkorde.models import TransformerTorch, TransformerScratch
 
 
 def fetch_kor2eng() -> Tuple[List[Tuple[str, str]],
@@ -42,11 +42,16 @@ def fetch_tokenizer(run: Run, ver: str = "latest") -> Tokenizer:
     return tokenizer
 
 
-def fetch_transformer(run: Run, ver: str = "latest") -> Transformer:
-    artifact_path = run.use_artifact(f"transformer:{ver}", type="model")\
-                       .checkout(root=TRANSFORMER_DIR)
+def fetch_transformer(run: Run, model: str, ver: str = "latest") -> TransformerTorch:
+    artifact_path = run.use_artifact(f"{model}:{ver}", type="model")\
+                       .checkout(root=TRANSFORMER_TORCH_DIR)
     ckpt_path = path.join(artifact_path, "transformer.ckpt")
-    transformer = Transformer.load_from_checkpoint(ckpt_path)
+    if model == TransformerTorch.name:
+        transformer = TransformerTorch.load_from_checkpoint(ckpt_path)
+    elif model == TransformerScratch.name:
+        transformer = TransformerScratch.load_from_checkpoint(ckpt_path)
+    else:
+        raise ValueError(f"Invalid model: {model}")
     return transformer
 
 

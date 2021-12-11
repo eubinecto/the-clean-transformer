@@ -62,7 +62,11 @@ class InferInputsBuilder(DataBuilder):
             for sent in srcs
         ])
         input_ids_tgt, attention_mask_tgt = self.encode([
-            # just start with bos_token. The remaining parts will be padded
+            # just start with bos_token.
+            # why no eos token at the end?
+            # A: because the label for eos token, i.e. pad token, is ignored in computing the loss anyways
+            # also, this may lead to the model repeating characters
+            # refer to: https://discuss.pytorch.org/t/transformer-mask-doesnt-do-anything/79765
             self.tokenizer.bos_token  # noqa
             for _ in srcs
         ])

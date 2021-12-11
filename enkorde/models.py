@@ -1,9 +1,9 @@
 import torch
 import numpy as np
-from abc import ABC
 from argparse import Namespace
 from typing import Tuple, List
 from pytorch_lightning import LightningModule
+from pytorch_lightning.utilities.types import EVAL_DATALOADERS, TRAIN_DATALOADERS
 from torchmetrics import Accuracy
 from torch.nn import functional as F
 from torch.optim import lr_scheduler
@@ -11,7 +11,19 @@ from tqdm import tqdm
 from enkorde import tensors
 
 
-class Transformer(LightningModule, ABC):
+class TransformerBase(LightningModule):
+    # just ignore these (boilerplate)
+    def train_dataloader(self) -> TRAIN_DATALOADERS:
+        pass
+
+    def test_dataloader(self) -> EVAL_DATALOADERS:
+        pass
+
+    def val_dataloader(self) -> EVAL_DATALOADERS:
+        pass
+
+    def predict_dataloader(self) -> EVAL_DATALOADERS:
+        pass
 
     def __init__(self, hidden_size: int, ffn_size: int,
                  vocab_size: int, max_length: int,
@@ -27,10 +39,7 @@ class Transformer(LightningModule, ABC):
                                             depth=depth,
                                             dropout=dropout,
                                             lr=lr))
-        # --- layers to optimise --- #
         self.token_embeddings = torch.nn.Embedding(num_embeddings=vocab_size, embedding_dim=hidden_size)
-        self.encoder = Encoder(hidden_size, ffn_size, max_length, heads, depth, dropout)  # the encoder stack
-        self.decoder = Decoder(hidden_size, ffn_size, max_length, heads, depth, dropout)  # the decoder stack
         # --- metrics --- #
         # accuracies are rather inappropriate measure of translation quality, but let's just use them as the
         # metrics to keep it simple.
@@ -45,24 +54,15 @@ class Transformer(LightningModule, ABC):
     def forward(self, src_ids: torch.Tensor, tgt_ids: torch.Tensor,
                 src_mask: torch.Tensor, tgt_mask: torch.Tensor) -> torch.Tensor:
         """
-        :param: src_ids (N, L)
-        :param: tgt_ids (N, L)
-        :param: src_mask (N, L)
-        :param: tgt_mask (N, L)
-        :return hidden: (N, L, H)
+        This is to be implemented by either TransformerTorch or TransformerScratch
+        :return (N, L, H)
         """
-        N, _ = src_ids.size()  # (N, L)
-        pos_encodings = self.pos_encodings.repeat(N, 1, 1)  # (L, H) -> (N, L, H)
-        src_embeddings = self.token_embeddings(src_ids) + pos_encodings  # (N, L, H) + (N, L, H) -> (N, L, H)
-        tgt_embeddings = self.token_embeddings(tgt_ids) + pos_encodings  # (N, L, H) + (N, L, H) -> (N, L, H)
-        memory = self.encoder(src_embeddings, src_mask)  # ... -> (N, L, H)
-        hidden = self.decoder(tgt_embeddings, memory, tgt_mask, src_mask)  # ... (N, L, H)
-        return hidden
+        raise NotImplementedError
 
     def step(self, X: torch.Tensor, y: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor]:
-        src_ids, src_mask = X[:, 0, 0], X[:, 0, 1]
-        tgt_ids, tgt_mask = X[:, 1, 0], X[:, 1, 1]
-        hidden = self.forward(src_ids, tgt_ids, src_mask, tgt_mask)  # ... -> (N, L, H)
+        src_ids, src_key_padding_mask = X[:, 0, 0], X[:, 0, 1]
+        tgt_ids, tgt_key_padding_mask = X[:, 1, 0], X[:, 1, 1]
+        hidden = self.forward(src_ids, tgt_ids, src_key_padding_mask, tgt_key_padding_mask)  # ... -> (N, L, H)
         # use the embedding table as the pre-softmax linear transformation (i.e. a token classifier)
         # "In our model, we share the same weight matrix between the two embedding layers and the pre-softmax
         # linear transformation" - pg.5
@@ -78,20 +78,24 @@ class Transformer(LightningModule, ABC):
 
     def predict(self, X: torch.Tensor) -> torch.Tensor:
         """
+        auto-regressive inference
         :param X: (N, 2, 2, L)
         :return: (N, L)
         """
-        src_ids, src_mask = X[:, 0, 0], X[:, 0, 1]
-        tgt_ids, tgt_mask = X[:, 1, 0], X[:, 1, 1]
+        src_ids, src_key_padding_mask = X[:, 0, 0], X[:, 0, 1]
+        tgt_ids, tgt_key_padding_mask = X[:, 1, 0], X[:, 1, 1]
         for time in range(1, self.hparams['max_length']):
-            hidden = self.forward(src_ids, tgt_ids, src_mask, tgt_mask)  # ... -> (N, L, H)
+            hidden = self.forward(src_ids, tgt_ids, src_key_padding_mask, tgt_key_padding_mask)  # ... -> (N, L, H)
             cls = self.token_embeddings.weight  # (|V|, H)
             logits = torch.einsum("nlh,vh->nlv", hidden, cls)  # (N, L, H) * (|V|, H) -> (N, L, |V|)
             probs = torch.softmax(logits, dim=2)  # (N, L, |V|) -> (N, L, |V|)
-            indices = torch.argmax(probs, dim=2)  # (N, L, |V|) -> (N, L, |V|)
-            preds = indices[:, time]  # (N, L) -> (N, 1)
-            tgt_ids[:, time] = preds  # predictions for this timestamp.
-            tgt_mask[:, time] = 1  # this should not be ignored anymore
+            # To keep things simple, we just use "greedy decoding" (just choose the tokens with the highest probability)
+            # Ideally, you would want a decoding strategy that is more sophisticated than that (e.g. beam search)
+            # for more information on decoding strategy - refer to: https://huggingface.co/blog/how-to-generate
+            ids = torch.argmax(probs, dim=2)  # (N, L, |V|) -> (N, L, |V|)
+            time_ids = ids[:, time]  # (N, L) -> (N, 1)
+            tgt_ids[:, time] = time_ids  # predictions for this timestamp.
+            tgt_key_padding_mask[:, time] = 1  # this should not be ignored in the next time step
         return tgt_ids
 
     def on_train_start(self):
@@ -152,6 +156,62 @@ class Transformer(LightningModule, ABC):
             'lr_scheduler': scheduler,
             'monitor': "Train/Average Loss"  # better monitor the accuracy
         }
+
+
+class TransformerTorch(TransformerBase):
+    name: str = "transformer_torch"
+
+    def __init__(self, hidden_size: int, ffn_size: int, vocab_size: int, max_length: int, pad_token_id: int, heads: int,
+                 depth: int, dropout: float, lr: float, device: torch.device):
+        super().__init__(hidden_size, ffn_size, vocab_size, max_length, pad_token_id, heads, depth, dropout, lr)
+        # --- for reference, we just use a Pytorch's implementation of transformer --- #
+        self.transformer = torch.nn.Transformer(d_model=hidden_size,
+                                                nhead=heads,
+                                                num_encoder_layers=depth,
+                                                num_decoder_layers=depth,
+                                                dim_feedforward=ffn_size,
+                                                dropout=dropout,
+                                                batch_first=True,
+                                                device=device)
+
+    def forward(self, src_ids: torch.Tensor, tgt_ids: torch.Tensor,
+                src_key_padding_mask: torch.Tensor, tgt_key_padding_mask: torch.Tensor) -> torch.Tensor:
+        N, _ = src_ids.size()
+        pos_encodings = self.pos_encodings.repeat(N, 1, 1)  # (L, H) -> (N, L, H)
+        src = self.token_embeddings(src_ids) + pos_encodings  # (N, L, H) + (N, L, H) -> (N, L, H)
+        tgt = self.token_embeddings(tgt_ids) + pos_encodings  # (N, L, H) + (N, L, H) -> (N, L, H)
+        # (N, L, H), (N, L, H) -> (N, L, H)
+        hidden = self.transformer.forward(src, tgt, src_key_padding_mask=src_key_padding_mask,
+                                          tgt_key_padding_mask=tgt_key_padding_mask)
+        return hidden
+
+
+class TransformerScratch(TransformerBase):
+    name: str = "transformer_scratch"
+
+    def __init__(self, hidden_size: int, ffn_size: int, vocab_size: int, max_length: int, pad_token_id: int, heads: int,
+                 depth: int, dropout: float, lr: float):
+        # --- we build the encoder and the decoder from scratch --- #
+        super().__init__(hidden_size, ffn_size, vocab_size, max_length, pad_token_id, heads, depth, dropout, lr)
+        self.encoder = Encoder(hidden_size, ffn_size, max_length, heads, depth, dropout)  # the encoder stack
+        self.decoder = Decoder(hidden_size, ffn_size, max_length, heads, depth, dropout)  # the decoder stack
+
+    def forward(self, src_ids: torch.Tensor, tgt_ids: torch.Tensor,
+                src_key_padding_mask: torch.Tensor, tgt_key_padding_mask: torch.Tensor) -> torch.Tensor:
+        """
+        :param: src_ids (N, L)
+        :param: tgt_ids (N, L)
+        :param: src_key_padding_mask (N, L)
+        :param: tgt_key_padding_mask (N, L)
+        :return hidden: (N, L, H)
+        """
+        N, _ = src_ids.size()  # (N, L)
+        pos_encodings = self.pos_encodings.repeat(N, 1, 1)  # (L, H) -> (N, L, H)
+        src = self.token_embeddings(src_ids) + pos_encodings  # (N, L, H) + (N, L, H) -> (N, L, H)
+        tgt = self.token_embeddings(tgt_ids) + pos_encodings  # (N, L, H) + (N, L, H) -> (N, L, H)
+        memory = self.encoder.forward(src, src_key_padding_mask)  # ... -> (N, L, H)
+        hidden = self.decoder.forward(tgt, memory, tgt_key_padding_mask, src_key_padding_mask)  # ... (N, L, H)
+        return hidden
 
 
 class FeedForward(torch.nn.Module):

@@ -19,6 +19,7 @@ def main():
     parser.add_argument("--log_every_n_steps", type=int, default=1)
     parser.add_argument("--fast_dev_run", action="store_true", default=False)
     parser.add_argument("--overfit_batches", type=int, default=0)
+    parser.add_argument("--check_val_every_n_epoch", type=int, default=1)
     args = parser.parse_args()
     config = fetch_config()['train'][args.model][args.ver]
     config.update(vars(args))
@@ -68,6 +69,7 @@ def main():
         logger = WandbLogger(log_model=False)
         lr_monitor = LearningRateMonitor(logging_interval='epoch')
         trainer = Trainer(fast_dev_run=config['fast_dev_run'],
+                          check_val_every_n_epoch=config['check_val_every_n_epoch'],
                           overfit_batches=config['overfit_batches'],
                           max_epochs=config['max_epochs'],
                           log_every_n_steps=config['log_every_n_steps'],

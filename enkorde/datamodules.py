@@ -5,7 +5,6 @@ import os
 import torch
 from typing import Tuple, Optional, List
 from tokenizers import Tokenizer
-from koila import lazy
 from torch.utils.data import Dataset, DataLoader
 from pytorch_lightning import LightningDataModule
 from enkorde.builders import TrainInputsBuilder, LabelsBuilder
@@ -18,8 +17,8 @@ os.environ["TOKENIZERS_PARALLELISM"] = "true"
 
 class DekordeDataset(Dataset):
     def __init__(self, X: torch.Tensor, y: torch.Tensor):
-        self.X = lazy(X, batch=0)
-        self.y = lazy(y, batch=0)
+        self.X = X
+        self.y = y
 
     def __getitem__(self, index: int) -> Tuple[torch.Tensor, torch.Tensor]:
         return self.X[index], self.y[index]

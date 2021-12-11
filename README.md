@@ -1,6 +1,42 @@
 # Enkorde
 
-한-영 번역을 위한 트랜스포머 밑바닥부터 구현 (광주인공지능사관학교/멋쟁이사자차럼 자연어처리 보충수업)
+트랜스포머 밑바닥부터 구현 (광주인공지능사관학교/멋쟁이사자차럼 자연어처리 보충수업)
+
+## Quick Start
+
+### 프로젝트 클론 & 가상환경 구축
+```shell
+git clone https://github.com/eubinecto/enkorde.git
+conda create -n enkorde python=3.9 
+conda activate enkorde
+conda install pip
+cd enkorde
+pip install -r requirements.txt
+```
+
+### 사전학습된 모델 다운로드 & 한국어 번역
+
+`main_infer.py` 스크립트를 실행합니다. 사전학습된 모델을 다운로드 하기 위해선 반드시 첫번째 인자 (`entity`)로 `eubinecto`를 넣어야 합니다.
+영어로 번역하고자 하는 한국어 문장을 `--kor` 인자로 넣어줍니다. 
+
+```shell
+python3 main_infer.py eubinecto --kor="그러나 이것은 또한 책상도 필요로 하지 않는다."
+```
+위 스크립트를 실행하면, 다음과 같은 선택창이 뜹니다:
+```text
+wandb: (1) Create a W&B account
+wandb: (2) Use an existing W&B account
+wandb: (3) Don't visualize my results
+wandb: Enter your choice: 
+```
+
+3을 입력 후 엔터를 눌러주세요. 이후 사전학습된 트랜스포머 모델이 `enkorde/artifacts/transformer_scratch` 에 다운로드되며, 다음과 같이 주어진 :
+```text
+wandb: You chose 'Don't visualize my results'
+wandb: Downloading large artifact transformer_torch:overfit_small, 262.36MB. 1 files... Done. 0:0:0
+그러나 이것은 또한 책 ##상 ##도 필요로 하지 않는다 . -> like all op ##ti ##ca ##l mic ##e , but it also doesn ' t need a des ##k .
+```
+
 
 ## 강의노트
 - [WEEK7: Transformer - why?](https://www.notion.so/WEEK7-Transformer-why-8e3712fb674a4ba2a85bf6da9cd36af0)
@@ -9,91 +45,3 @@
 - [WEEK9: How does Residual Connection & Layer normalisation work?](https://www.notion.so/WEEK9-How-does-Residual-Connection-Layer-normalisation-work-b4a41db45a014378bc1c4a0f6da3757e)
 - [WEEK9: How does Positional Encoding  work?](https://www.notion.so/WEEK9-How-does-Positional-Encoding-work-0d0e5b9d17464af08f39b4977c073beb)
 
-
-## Quick Start
-
-### Create a virtualenv and activate it 
-
-```shell
-conda create -n enkorde
-conda activate enkorde
-```
-
-### Install Dependencies
-```shell
-pip3 install -r requirements.txt
-```
-
-### Define Configurations
-
-`enkorde/config.yaml`을 입맛대로 변경하기:
-```yaml
-# --- config for training a model --- #
-train:
-  overfit:
-    hidden_size: 512
-    ffn_size: 512
-    heads: 32
-    depth: 3
-    max_epochs: 10
-    max_length: 145
-    batch_size: 64
-    lr: 0.0001
-    tokenizer: wp
-    dropout: 0.0
-    seed: 410
-    shuffle: true
-    data: kor2eng
-  # just to test things out
-  overfit_small:
-    hidden_size: 512
-    ffn_size: 512
-    heads: 32
-    depth: 3
-    max_epochs: 200
-    max_length: 145
-    batch_size: 64
-    lr: 0.0001
-    tokenizer: wp
-    dropout: 0.0
-    seed: 410
-    # shuffle the training set
-    shuffle: true
-    data: kor2eng_small
-
-# --- config for building a tokenizer --- #
-build:
-  vocab_size: 20000
-  pad: "[PAD]"
-  pad_id: 0
-  unk: "[UNK]"
-  unk_id: 1
-  bos: "[BOS]"
-  bos_id: 2
-  eos: "[EOS]"
-  eos_id: 3
-
-```
-
-### Build a tokenizer
-
-학습에 사용할 토크나이저 구축하기 (WordPiece (`ver=wp`) 혹은 Byte Pair Encoding (`ver=bpe`) 중 선택):
-```shell
-# building a WordPiece tokenizer
-python3 main_build.py --ver=wp
-```
-
-### Train a transformer
-
-트랜스포머에게 한-영 번역을 End-to-End로 가르치기 (`config.yaml` 에서 정의한 버전을 선택):
-```shell
-# overfitting a transformer on a small dataset 
-python3 main_train.py --ver=overfit_small
-```
-
-### Translate a Korean sentence with a pre-trained transformer
-
-학습된 트랜스포머로 한글을 영어로 번역해보기:
-```shell
-python3 main_infer.py --ver=overfit_small --sent="..."
-```

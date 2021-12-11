@@ -16,8 +16,8 @@ from tokenizers.models import BPE, WordPiece
 from tokenizers.normalizers import Lowercase
 from tokenizers.pre_tokenizers import Whitespace, Digits, Punctuation
 from tokenizers.trainers import BpeTrainer, WordPieceTrainer
-from dekorde.paths import ROOT_DIR
-from dekorde.fetchers import fetch_config, fetch_kor2eng
+from enkorde.paths import ROOT_DIR
+from enkorde.fetchers import fetch_config, fetch_kor2eng
 
 
 def main():

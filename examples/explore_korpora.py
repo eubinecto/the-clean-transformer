@@ -1,5 +1,5 @@
 from Korpora import Korpora
-from dekorde.paths import KORPORA_DIR
+from enkorde.paths import KORPORA_DIR
 from fetchers import fetch_kor2eng
 
 

@@ -1,6 +1,6 @@
 
-from dekorde.builders import build_lookahead_mask
-from dekorde.loaders import load_device
+from enkorde.builders import build_lookahead_mask
+from enkorde.loaders import load_device
 
 
 def main():

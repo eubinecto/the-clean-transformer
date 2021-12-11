@@ -1,4 +1,4 @@
-from dekorde.loaders import load_seoul2jeju
+from enkorde.loaders import load_seoul2jeju
 from pprint import pprint
 
 

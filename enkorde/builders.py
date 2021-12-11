@@ -12,14 +12,17 @@ class DataBuilder:
         raise NotImplementedError
 
     def encode(self, sents: List[str]) -> Tuple[torch.Tensor, torch.Tensor]:
-        # don't add special tokens, we will add them ourselves
+        # we use enable padding here, rather than on creating the tokenizer,
+        # to set maximum length on encoding
         self.tokenizer.enable_padding(pad_token=self.tokenizer.pad_token,  # noqa
                                       pad_id=self.tokenizer.pad_token_id,  # noqa
                                       length=self.max_length)
+        # don't add special tokens, we will add them ourselves
         encodings: List[Encoding] = self.tokenizer.encode_batch(sents, add_special_tokens=False)
         input_ids = torch.LongTensor([encoding.ids for encoding in encodings])
-        attention_mask = torch.LongTensor([encoding.attention_mask for encoding in encodings])
-        return input_ids, attention_mask
+        # 1's: non-pad tokens. 0's: padded tokens
+        mask = torch.LongTensor([encoding.attention_mask for encoding in encodings])
+        return input_ids, mask
 
 
 class TrainInputsBuilder(DataBuilder):
@@ -59,7 +62,7 @@ class InferInputsBuilder(DataBuilder):
             for sent in srcs
         ])
         input_ids_tgt, attention_mask_tgt = self.encode([
-            # just start with bos_token  (should be padded)
+            # just start with bos_token. The remaining parts will be padded
             self.tokenizer.bos_token  # noqa
             for _ in srcs
         ])

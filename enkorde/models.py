@@ -8,7 +8,7 @@ from torchmetrics import Accuracy
 from torch.nn import functional as F
 from torch.optim import lr_scheduler
 from tqdm import tqdm
-from dekorde import tensors
+from enkorde import tensors
 
 
 class Transformer(LightningModule, ABC):
@@ -32,11 +32,14 @@ class Transformer(LightningModule, ABC):
         self.encoder = Encoder(hidden_size, ffn_size, max_length, heads, depth, dropout)  # the encoder stack
         self.decoder = Decoder(hidden_size, ffn_size, max_length, heads, depth, dropout)  # the decoder stack
         # --- metrics --- #
-        # we are supposed to use bleu, but let's use accuracy as the metrics to keep things simple
+        # accuracies are rather inappropriate measure of translation quality, but let's just use them as the
+        # metrics to keep it simple.
         self.acc_train = Accuracy(ignore_index=pad_token_id)
         self.acc_val = Accuracy(ignore_index=pad_token_id)
         self.acc_test = Accuracy(ignore_index=pad_token_id)
         # --- we register any constant tensors to the buffer instead of using to(device) --- #
+        # this is to follow the best practice of multi-gpu training with pytorch-lightning
+        # https://pytorch-lightning.readthedocs.io/en/latest/advanced/multi_gpu.html#init-tensors-using-type-as-and-register-buffer
         self.register_buffer("pos_encodings", tensors.pos_encodings(max_length, hidden_size))  # (L, H)
 
     def forward(self, src_ids: torch.Tensor, tgt_ids: torch.Tensor,
@@ -60,9 +63,13 @@ class Transformer(LightningModule, ABC):
         src_ids, src_mask = X[:, 0, 0], X[:, 0, 1]
         tgt_ids, tgt_mask = X[:, 1, 0], X[:, 1, 1]
         hidden = self.forward(src_ids, tgt_ids, src_mask, tgt_mask)  # ... -> (N, L, H)
-        # use the embedding table as the classifier
+        # use the embedding table as the pre-softmax linear transformation (i.e. a token classifier)
+        # "In our model, we share the same weight matrix between the two embedding layers and the pre-softmax
+        # linear transformation" - pg.5
         cls = self.token_embeddings.weight  # (|V|, H)
-        # cross entropy of 3D input? - https://stackoverflow.com/a/63650146
+        # To compute a cross entropy of 3D input, the logits should follow the following shape:
+        # (batch_size, num_classes, max_length)
+        # - https://stackoverflow.com/a/63650146
         logits = torch.einsum("nlh,vh->nvl", hidden, cls)  # (N, |V|, L)
         # (N, |V|, L), (N, L) -> (N, 1) -> (1)
         # the lengths are different  -> pad should not be ignored
@@ -78,16 +85,16 @@ class Transformer(LightningModule, ABC):
         tgt_ids, tgt_mask = X[:, 1, 0], X[:, 1, 1]
         for time in range(1, self.hparams['max_length']):
             hidden = self.forward(src_ids, tgt_ids, src_mask, tgt_mask)  # ... -> (N, L, H)
-            cls = self.token_embeddings.weight
+            cls = self.token_embeddings.weight  # (|V|, H)
             logits = torch.einsum("nlh,vh->nvl", hidden, cls)  # (N, L, H) * (|V|, H) -> (N, |V|, L)
-            probs = torch.softmax(logits, dim=1)  # (N,|V|, L) -> (N, |V|, L)
-            indices = torch.argmax(probs, dim=1)  # (N,|V| ,L) -> (N, L)
+            probs = torch.softmax(logits, dim=1)  # (N, |V|, L) -> (N, |V|, L)
+            indices = torch.argmax(probs, dim=1)  # (N, |V| ,L) -> (N, L)
             preds = indices[:, time]  # (N, L) -> (N, 1)
-            tgt_ids[:, time] = preds
-            tgt_mask[:, time] = 1
+            tgt_ids[:, time] = preds  # predictions for this timestamp.
+            tgt_mask[:, time] = 1  # this should not be ignored anymore
         return tgt_ids
 
-    def on_train_start(self) -> None:
+    def on_train_start(self):
         # this is important!
         for param in tqdm(self.parameters(), desc="initialising weights..."):
             if param.dim() > 1:

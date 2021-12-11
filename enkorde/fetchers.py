@@ -6,12 +6,10 @@ import yaml
 from os import path
 from typing import Tuple, List
 from Korpora import KoreanParallelKOENNewsKorpus
-from Korpora.korpora import Korpus
 from tokenizers import Tokenizer
 from wandb.sdk.wandb_run import Run
-from dekorde.paths import CONFIG_YAML, KORPORA_DIR
-from dekorde.models import Transformer
-from pytorch_lightning import LightningModule
+from enkorde.paths import CONFIG_YAML, KORPORA_DIR, TOKENIZER_DIR, TRANSFORMER_DIR
+from enkorde.models import Transformer
 
 
 def fetch_kor2eng() -> Tuple[List[Tuple[str, str]],
@@ -27,7 +25,9 @@ def fetch_kor2eng() -> Tuple[List[Tuple[str, str]],
 
 def fetch_tokenizer(run: Run, ver: str = "latest") -> Tokenizer:
     artifact = run.use_artifact(f"tokenizer:{ver}", type="other")
-    artifact_path = artifact.checkout()
+    # use checkout instead of download to save space and simplify directory structures
+    # https://docs.wandb.ai/ref/python/artifact#checkout
+    artifact_path = artifact.checkout(root=TOKENIZER_DIR)
     json_path = path.join(artifact_path, "tokenizer.json")
     tokenizer = Tokenizer.from_file(json_path)
     # just manually register the special tokens
@@ -42,32 +42,12 @@ def fetch_tokenizer(run: Run, ver: str = "latest") -> Tokenizer:
     return tokenizer
 
 
-def fetch_transformer(run: Run, ver: str = "latest") -> LightningModule:
+def fetch_transformer(run: Run, ver: str = "latest") -> Transformer:
     artifact_path = run.use_artifact(f"transformer:{ver}", type="model")\
-                       .checkout()
+                       .checkout(root=TRANSFORMER_DIR)
     ckpt_path = path.join(artifact_path, "transformer.ckpt")
     transformer = Transformer.load_from_checkpoint(ckpt_path)
     return transformer
-
-
-def fetch_lstm(run: Run, ver: str = "latest") -> LightningModule:  # noqa
-    """
-    to be added later
-    :param run:
-    :param ver:
-    :return:
-    """
-    raise NotImplementedError
-
-
-def fetch_rnn(run: Run, ver: str = "latest") -> LightningModule:  # noqa
-    """
-    to be added later
-    :param run:
-    :param ver:
-    :return:
-    """
-    raise NotImplementedError
 
 
 # --- fetchers for fetching local files --- #

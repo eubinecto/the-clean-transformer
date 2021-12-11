@@ -5,10 +5,10 @@ import argparse
 from pytorch_lightning.callbacks import LearningRateMonitor
 from pytorch_lightning.loggers import WandbLogger
 from pytorch_lightning import Trainer
-from dekorde.models import Transformer
-from dekorde.fetchers import fetch_tokenizer, fetch_config
-from dekorde.paths import ROOT_DIR
-from dekorde.datamodules import Kor2EngDataModule, Kor2EngSmallDataModule
+from enkorde.models import Transformer
+from enkorde.fetchers import fetch_tokenizer, fetch_config
+from enkorde.paths import ROOT_DIR
+from enkorde.datamodules import Kor2EngDataModule, Kor2EngSmallDataModule
 
 
 def main():

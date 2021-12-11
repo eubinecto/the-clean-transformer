@@ -8,8 +8,8 @@ from tokenizers import Tokenizer
 from koila import lazy
 from torch.utils.data import Dataset, DataLoader
 from pytorch_lightning import LightningDataModule
-from dekorde.builders import TrainInputsBuilder, LabelsBuilder
-from dekorde.fetchers import fetch_kor2eng
+from enkorde.builders import TrainInputsBuilder, LabelsBuilder
+from enkorde.fetchers import fetch_kor2eng
 
 # to suppress warnings - we just allow parallelism
 # https://github.com/kakaobrain/pororo/issues/69#issuecomment-927564132

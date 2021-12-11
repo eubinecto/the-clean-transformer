@@ -1,7 +1,7 @@
 import wandb
 import argparse
-from dekorde.builders import InferInputsBuilder
-from dekorde.fetchers import fetch_config, fetch_tokenizer, fetch_transformer
+from enkorde.builders import InferInputsBuilder
+from enkorde.fetchers import fetch_config, fetch_tokenizer, fetch_transformer
 
 
 def main():

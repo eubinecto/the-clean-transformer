@@ -71,11 +71,13 @@ class Kor2EngDataModule(LightningDataModule):
 
 class Kor2EngSmallDataModule(Kor2EngDataModule):
     """
-    Just the first 50 sentences are prepared.
-    We use this just for testing things out
+    A small portion of Kor2Eng dataset.
+    Use this to test if your model can even learn anything.
     """
     name: str = "kor2eng_small"
 
     def prepare_data(self) -> None:
         kor2eng_train, self.kor2eng_val, self.kor2eng_test = fetch_kor2eng()
+        # keep the validation & test set,
+        # but use only a small portion of the training set
         self.kor2eng_train = kor2eng_train[:256]

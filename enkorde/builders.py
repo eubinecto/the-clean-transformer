@@ -84,7 +84,7 @@ class InferInputsBuilder(InputsBuilder):
             # also, this may lead to the model repeating characters
             # refer to: https://discuss.pytorch.org/t/transformer-mask-doesnt-do-anything/79765
             self.tokenizer.bos_token  # noqa
-            for _ in range(self.max_length)
+            for _ in range(batch_size)
         ])
         tgt_inputs = torch.stack([tgt_ids, tgt_key_padding_mask], dim=1)  # (N, 2, L)
         return tgt_inputs.long()

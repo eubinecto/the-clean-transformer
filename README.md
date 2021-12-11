@@ -1,4 +1,5 @@
 # Enkorde
+[![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/drive/181hTrhfbmyub7UaMJmBY_fbFfLBCBi58?usp=sharing)
 
 트랜스포머 밑바닥부터 구현 (광주인공지능사관학교/멋쟁이사자차럼 자연어처리 보충수업)
 
@@ -30,7 +31,8 @@ wandb: (3) Don't visualize my results
 wandb: Enter your choice: 
 ```
 
-3을 입력 후 엔터를 눌러주세요. 이후 사전학습된 트랜스포머 모델이 `enkorde/artifacts/transformer_scratch` 에 다운로드되며, 다음과 같이 주어진 :
+3을 입력 후 엔터를 눌러주세요. 이후 사전학습된 트랜스포머 모델이 `enkorde/artifacts/transformer_scratch` 에 다운로드되며, 다음과 같이 주어진
+`--kor` 문장을 영어로 번역합니다:
 ```text
 wandb: You chose 'Don't visualize my results'
 wandb: Downloading large artifact transformer_torch:overfit_small, 262.36MB. 1 files... Done. 0:0:0

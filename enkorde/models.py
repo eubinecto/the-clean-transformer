@@ -86,9 +86,9 @@ class Transformer(LightningModule, ABC):
         for time in range(1, self.hparams['max_length']):
             hidden = self.forward(src_ids, tgt_ids, src_mask, tgt_mask)  # ... -> (N, L, H)
             cls = self.token_embeddings.weight  # (|V|, H)
-            logits = torch.einsum("nlh,vh->nvl", hidden, cls)  # (N, L, H) * (|V|, H) -> (N, |V|, L)
-            probs = torch.softmax(logits, dim=1)  # (N, |V|, L) -> (N, |V|, L)
-            indices = torch.argmax(probs, dim=1)  # (N, |V| ,L) -> (N, L)
+            logits = torch.einsum("nlh,vh->nlv", hidden, cls)  # (N, L, H) * (|V|, H) -> (N, L, |V|)
+            probs = torch.softmax(logits, dim=2)  # (N, L, |V|) -> (N, L, |V|)
+            indices = torch.argmax(probs, dim=2)  # (N, L, |V|) -> (N, L, |V|)
             preds = indices[:, time]  # (N, L) -> (N, 1)
             tgt_ids[:, time] = preds  # predictions for this timestamp.
             tgt_mask[:, time] = 1  # this should not be ignored anymore
@@ -304,7 +304,7 @@ class MultiHeadAttentionLayer(torch.nn.Module):
         # --- any constant tensors must be registered to a buffer --- #
         self.register_buffer("subsequent_mask", tensors.subsequent_mask(max_length))
 
-    def forward(self, q: torch.Tensor, k: torch.Tensor, v: torch.Tensor, key_mask: torch.Tensor) -> torch.Tensor:
+    def forward(self, q: torch.Tensor, k: torch.Tensor, v: torch.Tensor, key_mask: torch.LongTensor) -> torch.Tensor:
         """
         :param q: (N, L, H)
         :param k: (N, L, H)
@@ -337,12 +337,12 @@ class MultiHeadAttentionLayer(torch.nn.Module):
                                      q: torch.Tensor,
                                      k: torch.Tensor,
                                      v: torch.Tensor,
-                                     key_mask: torch.Tensor) -> torch.Tensor:
+                                     key_mask: torch.LongTensor) -> torch.Tensor:
         """
          # --- einsum symbols --- #
          n = N
          h = heads
-         i, j = L
+         q, k = the length of queries and keys
          s = head_size
         :param q: (N, heads, L, H // heads)
         :param k: (N, heads, L, H // heads)
@@ -356,29 +356,29 @@ class MultiHeadAttentionLayer(torch.nn.Module):
         q /= np.sqrt(self.head_size)
         k /= np.sqrt(self.head_size)
         # (N, heads, L, H // heads) * (N, heads, L, H // heads) -> (N, heads, L, L)
-        # sims_{nhij} = \sum_{d = 1}^{d= H // heads}{Q_{nhis} * K_{nhjs}}
+        # sims_{nhqk} = \sum_{d = 1}^{d= H // heads}{Q_{nhqs} * K_{nhks}}
         # that is, we reduce the matrices over the "m" dimension
-        sims = torch.einsum("nhis,nhjs->nhij", q, k)
+        sims = torch.einsum("nhqs,nhks->nhqk", q, k)
         # the padded tokens are masked
         # (N, L) -> (N, heads, L, L)
         sims = sims.masked_fill(self.build_mask(key_mask) == 0, float("-inf"))
         # then normalise the sims to get the attention scores
         attentions = torch.softmax(sims, dim=3)  # (N, heads, L, L), normalise over keys
         # (N, heads, L, L) * (N, heads, L,  H // heads) -> (N, heads, L, H // heads)
-        # contexts_{nhim} = \sum_{j = 1}^{j = L}{attentions_{nhij} * V_{nhjs}}
-        # that is, we reduce the matrices over the "j" dimension - the key dimension
-        contexts = torch.einsum("nhij,nhjs->nhis", attentions, v)
+        # contexts_{nhqs} = \sum_{j = 1}^{j = L}{attentions_{nhqk} * V_{nhks}}
+        # that is, we reduce the matrices over the "k" dimension - the key dimension
+        contexts = torch.einsum("nhqk,nhks->nhqs", attentions, v)
         # (N, heads, L, H // heads) -> (N, L, heads, H // heads) -> (N, L, H)
         # why transpose?
         # A: so that we properly "concatenate" heads & H // heads dimension to hidden_size
-        # why should you call contiguous after transpose?
+        # why should you call contiguous after transpose and before view?
         # A: https://stackoverflow.com/a/52229694
         contexts = contexts.transpose(1, 2) \
                            .contiguous() \
                            .view(N, -1, self.hidden_size)
         return contexts
 
-    def build_mask(self, key_mask: torch.Tensor):
+    def build_mask(self, key_mask: torch.LongTensor) -> torch.LongTensor:
         """
         :param key_mask: (N, L)
         :return: mask (N,heads, L, L)
@@ -386,12 +386,12 @@ class MultiHeadAttentionLayer(torch.nn.Module):
         N, L = key_mask.size()
         # (N, L) -> (N, 1, 1, L) -> (N, heads, L, L)
         mask = key_mask.view(N, 1, 1, L)\
-                       .expand(-1, self.heads, L, -1)
+                       .repeat(1, self.heads, L, 1)
         # if masked, apply (logical-and it) the lookahead mask
         if self.masked:
             # (N, L) -> (N, 1, 1, L) -> (N, heads, L, L)
             subsequent_mask = self.subsequent_mask.view(1, 1, L, L)\
-                                                  .expand(N, self.heads, -1, -1)
+                                                  .repeat(N, self.heads, 1, 1)
             # (N, heads, L, L), (N, heads, L, L) -> (N, heads, L, L)
-            mask = torch.logical_and(mask, subsequent_mask)
+            mask = torch.logical_and(mask, subsequent_mask).long()
         return mask

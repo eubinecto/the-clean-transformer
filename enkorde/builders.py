@@ -40,8 +40,8 @@ class TrainInputsBuilder(DataBuilder):
         ])
         # the target sentences, which are to be fed as the inputs to the decoder
         input_ids_tgt, attention_mask_tgt = self.encode([
-            # starts with bos, ends with  eos.
-            self.tokenizer.bos_token + " " + sent +  " " + self.tokenizer.eos_token  # noqa
+            # starts with bos, but does not end with eos (pad token is ignored anyways)
+            self.tokenizer.bos_token + " " + sent  # noqa
             for sent in tgts
         ])
         inputs_src = torch.stack([input_ids_src, attention_mask_src], dim=1)

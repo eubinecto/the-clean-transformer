@@ -6,8 +6,8 @@ from enkorde.fetchers import fetch_config, fetch_tokenizer, fetch_transformer
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--ver", type=str, default="overfit")
-    parser.add_argument("--kor", type=str, default="안녕하세요")
+    parser.add_argument("--ver", type=str, default="overfit_small")
+    parser.add_argument("--kor", type=str, default="양측은 또한 지구 온난화와 새 국제 형사 재판소를 포함한 광범위한 문제에 대해 견해 차이를 보여왔다.")
     args = parser.parse_args()
     config = fetch_config()['train'][args.ver]
     config.update(vars(args))

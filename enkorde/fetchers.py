@@ -3,14 +3,14 @@ what does it mean by "fetch"?: https://www.quora.com/What-does-fetch-means-in-co
 Korpora 에서도 fetch 라고 표현한다: https://github.com/ko-nlp/Korpora
 """
 import torch
+import wandb
 import yaml
 from os import path
 from typing import Tuple, List
 from Korpora import KoreanParallelKOENNewsKorpus
 from tokenizers import Tokenizer
-from wandb.sdk.wandb_run import Run
 from enkorde.paths import CONFIG_YAML, KORPORA_DIR, TOKENIZER_DIR, TRANSFORMER_TORCH_DIR, TRANSFORMER_SCRATCH_DIR
-from enkorde.models import TransformerTorch, TransformerScratch
+from enkorde.models import TransformerTorch, TransformerScratch, TransformerBase
 
 
 def fetch_kor2eng() -> Tuple[List[Tuple[str, str]],
@@ -24,8 +24,9 @@ def fetch_kor2eng() -> Tuple[List[Tuple[str, str]],
     return kor2eng_train, kor2eng_val, kor2eng_test
 
 
-def fetch_tokenizer(run: Run, ver: str = "latest") -> Tokenizer:
-    artifact = run.use_artifact(f"tokenizer:{ver}", type="other")
+def fetch_tokenizer(entity: str, ver: str) -> Tokenizer:
+    api = wandb.Api()
+    artifact = api.artifact(f"{entity}/enkorde/tokenizer:{ver}", type="other")
     # use checkout instead of download to save space and simplify directory structures
     # https://docs.wandb.ai/ref/python/artifact#checkout
     artifact_path = artifact.checkout(root=TOKENIZER_DIR)
@@ -43,14 +44,16 @@ def fetch_tokenizer(run: Run, ver: str = "latest") -> Tokenizer:
     return tokenizer
 
 
-def fetch_transformer(run: Run, model: str, ver: str = "latest", device: torch.device = None) -> TransformerTorch:
+def fetch_transformer(entity: str, model: str, ver: str, device: torch.device = None)\
+        -> TransformerBase:
+    api = wandb.Api()
     if model == TransformerTorch.name:
-        artifact_path = run.use_artifact(f"{model}:{ver}", type="model") \
+        artifact_path = api.artifact(f"{entity}/enkorde/{model}:{ver}", type="model") \
                            .checkout(root=TRANSFORMER_TORCH_DIR)
         ckpt_path = path.join(artifact_path, "transformer.ckpt")
         transformer = TransformerTorch.load_from_checkpoint(ckpt_path, device=device)
     elif model == TransformerScratch.name:
-        artifact_path = run.use_artifact(f"{model}:{ver}", type="model") \
+        artifact_path = api.artifact(f"{entity}/enkorde/{model}:{ver}", type="model") \
                            .checkout(root=TRANSFORMER_SCRATCH_DIR)
         ckpt_path = path.join(artifact_path, "transformer.ckpt")
         transformer = TransformerScratch.load_from_checkpoint(ckpt_path)

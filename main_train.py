@@ -13,6 +13,7 @@ from enkorde.datamodules import Kor2EngDataModule, Kor2EngSmallDataModule
 
 def main():
     parser = argparse.ArgumentParser()
+    parser.add_argument("entity", type=str)
     parser.add_argument("--model", type=str, default="transformer_torch")
     parser.add_argument("--ver", type=str, default="overfit")
     parser.add_argument("--num_workers", type=int, default=4)
@@ -23,10 +24,9 @@ def main():
     args = parser.parse_args()
     config = fetch_config()['train'][args.model][args.ver]
     config.update(vars(args))
-
-    with wandb.init(entity="eubinecto", project="dekorde", config=config) as run:
+    with wandb.init(entity=config['entity'], project="enkorde", config=config) as run:
         # --- fetch a pre-trained tokenizer from wandb -- #
-        tokenizer = fetch_tokenizer(run, config['tokenizer'])
+        tokenizer = fetch_tokenizer(config['entity'], config['tokenizer'])
         # --- choose the implementation of transformer to train --- #
         if config['model'] == TransformerTorch.name:
             # why do we need to provide a device?

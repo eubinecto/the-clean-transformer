@@ -24,6 +24,7 @@ from enkorde.fetchers import fetch_config, fetch_kor2eng
 
 def main():
     parser = argparse.ArgumentParser()
+    parser.add_argument("entity", type=str)
     parser.add_argument("--ver", type=str, default="wp")
     args = parser.parse_args()
     config = fetch_config()["build"]
@@ -45,7 +46,7 @@ def main():
     tokenizer.pre_tokenizer = pre_tokenizers.Sequence([Whitespace(), Digits(), Punctuation()])  # noqa
     tokenizer.normalizer = normalizers.Sequence([Lowercase()])  # noqa
     # --- prepare the data --- #
-    with wandb.init(entity="eubinecto", project="dekorde", config=config) as run:
+    with wandb.init(entity=config['entity'], project="dekorde", config=config) as run:
         kor2eng_train, kor2eng_val, kor2eng_test = fetch_kor2eng()
         # chaining two generators;  https://stackoverflow.com/a/3211047
         iterator = chain((kor for kor, _ in kor2eng_train),

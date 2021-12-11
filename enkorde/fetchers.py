@@ -2,6 +2,7 @@
 what does it mean by "fetch"?: https://www.quora.com/What-does-fetch-means-in-computer-science
 Korpora 에서도 fetch 라고 표현한다: https://github.com/ko-nlp/Korpora
 """
+import torch
 import yaml
 from os import path
 from typing import Tuple, List
@@ -42,12 +43,12 @@ def fetch_tokenizer(run: Run, ver: str = "latest") -> Tokenizer:
     return tokenizer
 
 
-def fetch_transformer(run: Run, model: str, ver: str = "latest") -> TransformerTorch:
+def fetch_transformer(run: Run, model: str, ver: str = "latest", device: torch.device = None) -> TransformerTorch:
     artifact_path = run.use_artifact(f"{model}:{ver}", type="model")\
                        .checkout(root=TRANSFORMER_TORCH_DIR)
     ckpt_path = path.join(artifact_path, "transformer.ckpt")
     if model == TransformerTorch.name:
-        transformer = TransformerTorch.load_from_checkpoint(ckpt_path)
+        transformer = TransformerTorch.load_from_checkpoint(ckpt_path, device=device)
     elif model == TransformerScratch.name:
         transformer = TransformerScratch.load_from_checkpoint(ckpt_path)
     else:

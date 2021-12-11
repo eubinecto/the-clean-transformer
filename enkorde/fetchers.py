@@ -44,12 +44,15 @@ def fetch_tokenizer(run: Run, ver: str = "latest") -> Tokenizer:
 
 
 def fetch_transformer(run: Run, model: str, ver: str = "latest", device: torch.device = None) -> TransformerTorch:
-    artifact_path = run.use_artifact(f"{model}:{ver}", type="model")\
-                       .checkout(root=TRANSFORMER_TORCH_DIR)
-    ckpt_path = path.join(artifact_path, "transformer.ckpt")
     if model == TransformerTorch.name:
+        artifact_path = run.use_artifact(f"{model}:{ver}", type="model") \
+                           .checkout(root=TRANSFORMER_TORCH_DIR)
+        ckpt_path = path.join(artifact_path, "transformer.ckpt")
         transformer = TransformerTorch.load_from_checkpoint(ckpt_path, device=device)
     elif model == TransformerScratch.name:
+        artifact_path = run.use_artifact(f"{model}:{ver}", type="model") \
+                           .checkout(root=TRANSFORMER_SCRATCH_DIR)
+        ckpt_path = path.join(artifact_path, "transformer.ckpt")
         transformer = TransformerScratch.load_from_checkpoint(ckpt_path)
     else:
         raise ValueError(f"Invalid model: {model}")

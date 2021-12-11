@@ -84,7 +84,10 @@ class TransformerBase(LightningModule):
         """
         src_ids, src_key_padding_mask = X[:, 0, 0], X[:, 0, 1]
         tgt_ids, tgt_key_padding_mask = X[:, 1, 0], X[:, 1, 1]
-        for time in range(1, self.hparams['max_length']):
+        # run an autoregressive inference
+        # refer to Alammar's amazing blog post: https://jalammar.github.io/illustrated-transformer/
+        # in particular, this gif: https://jalammar.github.io/images/t/transformer_decoding_2.gif
+        for t in range(self.hparams['max_length'] - 1):
             hidden = self.forward(src_ids, tgt_ids, src_key_padding_mask, tgt_key_padding_mask)  # ... -> (N, L, H)
             cls = self.token_embeddings.weight  # (|V|, H)
             logits = torch.einsum("nlh,vh->nlv", hidden, cls)  # (N, L, H) * (|V|, H) -> (N, L, |V|)
@@ -92,10 +95,11 @@ class TransformerBase(LightningModule):
             # To keep things simple, we just use "greedy decoding" (just choose the tokens with the highest probability)
             # Ideally, you would want a decoding strategy that is more sophisticated than that (e.g. beam search)
             # for more information on decoding strategy - refer to: https://huggingface.co/blog/how-to-generate
-            ids = torch.argmax(probs, dim=2)  # (N, L, |V|) -> (N, L, |V|)
-            time_ids = ids[:, time]  # (N, L) -> (N, 1)
-            tgt_ids[:, time] = time_ids  # predictions for this timestamp.
-            tgt_key_padding_mask[:, time] = 1  # this should not be ignored in the next time step
+            pred_ids = torch.argmax(probs, dim=2)  # (N, L, |V|) -> (N, L)
+            # use the pred_ids for this time step as the tgt_ids for the next time step
+            tgt_ids[:, t + 1] = pred_ids[:, t]
+            # next tgt_ids must not be ignored, so remove the mask for the next time step
+            tgt_key_padding_mask[:, t + 1] = 0
         return tgt_ids
 
     def on_train_start(self):

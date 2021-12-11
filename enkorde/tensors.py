@@ -31,6 +31,8 @@ def pos_encodings(max_length: int, hidden_size: int) -> torch.Tensor:
     encodings = torch.zeros(size=(max_length, hidden_size))  # (L, H)
     # fill in the pairs
     encodings[:, ::2] = torch.sin(freqs * positions)   # evens = sin
-    encodings[:, 1::2] = torch.cos(freqs * positions)  # odds = cos, with the same frequency as above
-    # hence, PE(pos + k) - PE(pos) stays constant
+    # odds = cos, but with the same frequency as above
+    # why the same frequency?
+    # A: so that dist(PE(pos + k) - PE(pos)) stays constant
+    encodings[:, 1::2] = torch.cos(freqs * positions)
     return encodings

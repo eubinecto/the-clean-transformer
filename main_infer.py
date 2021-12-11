@@ -9,7 +9,7 @@ def main():
     parser.add_argument("entity", type=str, help="a wandb entity to download artifacts from")
     parser.add_argument("--model", type=str, default="transformer_scratch")
     parser.add_argument("--ver", type=str, default="overfit_small")
-    parser.add_argument("--kor", type=str, default="그러나 이것은 또한 책상도 필요로 하지 않는다.")
+    parser.add_argument("--kor", type=str, default="결정적인 순간에 그들의 능력을 증가시켜 줄 그 무엇이 매우 중요합니다")
     args = parser.parse_args()
     config = fetch_config()['train'][args.model][args.ver]
     config.update(vars(args))

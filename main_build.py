@@ -5,6 +5,8 @@ A script for building a tokenizer (fit your tokenizer to the data you have)
 3. wordpiece
 # refer to the tutorial below.
 https://huggingface.co/docs/tokenizers/python/latest/pipeline.html
+# for more details on normalizers, pre/post & tokenizers
+https://huggingface.co/docs/tokenizers/python/latest/components.html
 """
 import os
 import wandb

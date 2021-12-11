@@ -5,12 +5,17 @@ they will be registered as buffers.
 import torch
 
 
-def subsequent_mask(max_length: int) -> torch.LongTensor:
+def all_mask(max_length: int) -> torch.BoolTensor:
+    mask = torch.ones(size=(max_length, max_length)).bool()
+    return mask
+
+
+def subsequent_mask(max_length: int) -> torch.BoolTensor:
     """
     :return: (L, L)
     """
-    ones = torch.ones(size=(max_length, max_length))  # ... -> (L, L)
-    return torch.tril(ones, diagonal=0).long()  # (L, L) -> (L, L)
+    mask = torch.tril(all_mask(max_length), diagonal=0).bool()  # (L, L) -> (L, L)
+    return mask
 
 
 def pos_encodings(max_length: int, hidden_size: int) -> torch.Tensor:

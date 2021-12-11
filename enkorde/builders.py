@@ -1,4 +1,5 @@
 import torch
+from abc import ABC
 from typing import List, Tuple
 from tokenizers import Tokenizer, Encoding
 
@@ -19,61 +20,75 @@ class DataBuilder:
                                       length=self.max_length)
         # don't add special tokens, we will add them ourselves
         encodings: List[Encoding] = self.tokenizer.encode_batch(sents, add_special_tokens=False)
-        input_ids = torch.LongTensor([encoding.ids for encoding in encodings])
+        ids = torch.LongTensor([encoding.ids for encoding in encodings])
         # 1's: non-pad tokens. 0's: padded tokens
-        mask = torch.LongTensor([encoding.attention_mask for encoding in encodings])
-        return input_ids, mask
+        key_padding_mask = torch.BoolTensor([encoding.attention_mask for encoding in encodings])
+        return ids, key_padding_mask
 
 
-class TrainInputsBuilder(DataBuilder):
+class InputsBuilder(DataBuilder, ABC):
 
-    def __call__(self, srcs: List[str], tgts: List[str]) -> torch.Tensor:
-        """
-        :param srcs:
-        :param tgts:
-        :return: (N, 2, 2, L) - input_ids & attention_mask
-        """
+    def src_inputs(self, srcs: List[str]) -> torch.Tensor:
         # the source sentences, which are to be fed as the inputs to the encoder
-        input_ids_src, attention_mask_src = self.encode([
+        src_ids, src_key_padding_mask = self.encode([
             self.tokenizer.bos_token + " " + sent + " " + self.tokenizer.eos_token  # noqa
             for sent in srcs
         ])
+        src_inputs = torch.stack([src_ids, src_key_padding_mask], dim=1)  # (N, 2, L)
+        return src_inputs
+
+    def tgt_inputs(self, tgts: List[str]) -> torch.Tensor:
+        raise NotImplementedError
+
+
+class TrainInputsBuilder(InputsBuilder):
+
+    def __call__(self, srcs: List[str], tgts: List[str]) -> torch.Tensor:
+        assert len(srcs) == len(tgts)
+        src_inputs = self.src_inputs(srcs)  # (N, 2, L)
+        tgt_inputs = self.tgt_inputs(tgts)  # (N, 2, L)
+        inputs = torch.stack([src_inputs, tgt_inputs], dim=1)  # (N, 2, 2, L)
+        return inputs
+
+    def tgt_inputs(self, tgts: List[str]) -> torch.Tensor:
+        """
+        :param tgts:
+        :return: (N, 2, 2, L) - the 3's: input_ids, input_mask, input_key_padding_mask
+        """
         # the target sentences, which are to be fed as the inputs to the decoder
-        input_ids_tgt, attention_mask_tgt = self.encode([
+        tgt_ids, tgt_key_padding_mask = self.encode([
             # starts with bos, but does not end with eos (pad token is ignored anyways)
             self.tokenizer.bos_token + " " + sent  # noqa
             for sent in tgts
         ])
-        inputs_src = torch.stack([input_ids_src, attention_mask_src], dim=1)
-        inputs_tgt = torch.stack([input_ids_tgt, attention_mask_tgt], dim=1)
-        inputs = torch.stack([inputs_src, inputs_tgt], dim=1)
+        tgt_inputs = torch.stack([tgt_ids, tgt_key_padding_mask], dim=1)  # (N, 2, L)
+        return tgt_inputs
+
+
+class InferInputsBuilder(InputsBuilder):
+
+    def __call__(self, srcs: List[str]) -> torch.Tensor:
+        src_inputs = self.src_inputs(srcs)  # (N, 2, L)
+        tgt_inputs = self.tgt_inputs(len(srcs))  # (N, 2, L)
+        inputs = torch.stack([src_inputs, tgt_inputs], dim=1)  # (N, 2, 2, L)
         return inputs
 
-
-class InferInputsBuilder(DataBuilder):
-    def __call__(self, srcs: List[str]) -> torch.Tensor:
+    def tgt_inputs(self, batch_size: int) -> torch.Tensor:
         """
-        :param srcs:
+        :param batch_size:
         :return: (N, 2, L)
         """
-        # the source sentences, which are to be fed as the inputs to the encoder
-        input_ids_src, attention_mask_src = self.encode([
-            self.tokenizer.bos_token + " " + sent + " " + self.tokenizer.eos_token  # noqa
-            for sent in srcs
-        ])
-        input_ids_tgt, attention_mask_tgt = self.encode([
+        tgt_ids, tgt_key_padding_mask = self.encode([
             # just start with bos_token.
             # why no eos token at the end?
             # A: because the label for eos token, i.e. pad token, is ignored in computing the loss anyways
             # also, this may lead to the model repeating characters
             # refer to: https://discuss.pytorch.org/t/transformer-mask-doesnt-do-anything/79765
             self.tokenizer.bos_token  # noqa
-            for _ in srcs
+            for _ in range(self.max_length)
         ])
-        inputs_src = torch.stack([input_ids_src, attention_mask_src], dim=1)
-        inputs_tgt = torch.stack([input_ids_tgt, attention_mask_tgt], dim=1)
-        inputs = torch.stack([inputs_src, inputs_tgt], dim=1)
-        return inputs
+        tgt_inputs = torch.stack([tgt_ids, tgt_key_padding_mask], dim=1)  # (N, 2, L)
+        return tgt_inputs
 
 
 class LabelsBuilder(DataBuilder):
@@ -84,9 +99,9 @@ class LabelsBuilder(DataBuilder):
         :return: (N, L)
         """
         # to be used as the labels
-        input_ids, _ = self.encode([
+        label_ids, _ = self.encode([
             # does not start with bos, but ends with eos (right-shifted)
             sent + " " + self.tokenizer.eos_token  # noqa
             for sent in tgts
         ])
-        return input_ids
+        return label_ids

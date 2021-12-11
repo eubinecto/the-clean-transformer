@@ -8,7 +8,7 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--model", type=str, default="transformer_torch")
     parser.add_argument("--ver", type=str, default="overfit_small")
-    parser.add_argument("--kor", type=str, default="양측은 또한 지구 온난화와 새 국제 형사 재판소를 포함한 광범위한 문제에 대해 견해 차이를 보여왔다.")
+    parser.add_argument("--kor", type=str, default="그러나 이것은 또한 책상도 필요로 하지 않는다.")
     args = parser.parse_args()
     config = fetch_config()['train'][args.model][args.ver]
     config.update(vars(args))
@@ -19,11 +19,11 @@ def main():
         transformer.eval()
         kors = [config['kor']]
         X = InferInputsBuilder(tokenizer, config['max_length'])(srcs=kors)
-        srcs = X[:, 0, 0].squeeze().tolist()  # (1, 2, 2, L) -> (1, L) -> (L) -> list
-        preds = transformer.predict(X).squeeze().tolist()  # (1, L) -> (L) -> list
-        print([tokenizer.id_to_token(src) for src in srcs])
+        src_ids = X[:, 0, 0].squeeze().tolist()  # (1, 2, 2, L) -> (1, L) -> (L) -> list
+        pred_ids = transformer.predict(X).squeeze().tolist()  # (1, L) -> (L) -> list
+        print([tokenizer.id_to_token(src_id) for src_id in src_ids])
         print("->")
-        print([tokenizer.id_to_token(pred) for pred in preds])
+        print([tokenizer.id_to_token(pred_id) for pred_id in pred_ids])
 
 
 if __name__ == '__main__':

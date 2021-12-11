@@ -7,8 +7,9 @@ from enkorde.paths import WANDB_DIR
 
 
 def main():
+    model = "transformer_torch"
     ver = "overfit_small"
-    config = fetch_config()['train'][ver]
+    config = fetch_config()['train'][model][ver]
     config.update({'num_workers': 2})
 
     with wandb.init(entity="eubinecto", project="dekorde", dir=WANDB_DIR) as run:

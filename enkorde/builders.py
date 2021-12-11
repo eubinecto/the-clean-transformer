@@ -12,7 +12,7 @@ class DataBuilder:
     def __call__(self, *args) -> torch.Tensor:
         raise NotImplementedError
 
-    def encode(self, sents: List[str]) -> Tuple[torch.Tensor, torch.Tensor]:
+    def encode(self, sents: List[str]) -> Tuple[torch.LongTensor, torch.LongTensor]:
         # we use enable padding here, rather than on creating the tokenizer,
         # to set maximum length on encoding
         self.tokenizer.enable_padding(pad_token=self.tokenizer.pad_token,  # noqa
@@ -21,36 +21,35 @@ class DataBuilder:
         # don't add special tokens, we will add them ourselves
         encodings: List[Encoding] = self.tokenizer.encode_batch(sents, add_special_tokens=False)
         ids = torch.LongTensor([encoding.ids for encoding in encodings])
-        # 1's: non-pad tokens. 0's: padded tokens
-        key_padding_mask = torch.BoolTensor([encoding.attention_mask for encoding in encodings])
+        key_padding_mask = (torch.LongTensor([encoding.attention_mask for encoding in encodings]) == 0).long()
         return ids, key_padding_mask
 
 
 class InputsBuilder(DataBuilder, ABC):
 
-    def src_inputs(self, srcs: List[str]) -> torch.Tensor:
+    def src_inputs(self, srcs: List[str]) -> torch.LongTensor:
         # the source sentences, which are to be fed as the inputs to the encoder
         src_ids, src_key_padding_mask = self.encode([
             self.tokenizer.bos_token + " " + sent + " " + self.tokenizer.eos_token  # noqa
             for sent in srcs
         ])
         src_inputs = torch.stack([src_ids, src_key_padding_mask], dim=1)  # (N, 2, L)
-        return src_inputs
+        return src_inputs.long()
 
-    def tgt_inputs(self, tgts: List[str]) -> torch.Tensor:
+    def tgt_inputs(self, tgts: List[str]) -> torch.LongTensor:
         raise NotImplementedError
 
 
 class TrainInputsBuilder(InputsBuilder):
 
-    def __call__(self, srcs: List[str], tgts: List[str]) -> torch.Tensor:
+    def __call__(self, srcs: List[str], tgts: List[str]) -> torch.LongTensor:
         assert len(srcs) == len(tgts)
         src_inputs = self.src_inputs(srcs)  # (N, 2, L)
         tgt_inputs = self.tgt_inputs(tgts)  # (N, 2, L)
         inputs = torch.stack([src_inputs, tgt_inputs], dim=1)  # (N, 2, 2, L)
-        return inputs
+        return inputs.long()
 
-    def tgt_inputs(self, tgts: List[str]) -> torch.Tensor:
+    def tgt_inputs(self, tgts: List[str]) -> torch.LongTensor:
         """
         :param tgts:
         :return: (N, 2, 2, L) - the 3's: input_ids, input_mask, input_key_padding_mask
@@ -62,18 +61,18 @@ class TrainInputsBuilder(InputsBuilder):
             for sent in tgts
         ])
         tgt_inputs = torch.stack([tgt_ids, tgt_key_padding_mask], dim=1)  # (N, 2, L)
-        return tgt_inputs
+        return tgt_inputs.long()
 
 
 class InferInputsBuilder(InputsBuilder):
 
-    def __call__(self, srcs: List[str]) -> torch.Tensor:
+    def __call__(self, srcs: List[str]) -> torch.LongTensor:
         src_inputs = self.src_inputs(srcs)  # (N, 2, L)
         tgt_inputs = self.tgt_inputs(len(srcs))  # (N, 2, L)
         inputs = torch.stack([src_inputs, tgt_inputs], dim=1)  # (N, 2, 2, L)
-        return inputs
+        return inputs.long()
 
-    def tgt_inputs(self, batch_size: int) -> torch.Tensor:
+    def tgt_inputs(self, batch_size: int) -> torch.LongTensor:
         """
         :param batch_size:
         :return: (N, 2, L)
@@ -88,7 +87,7 @@ class InferInputsBuilder(InputsBuilder):
             for _ in range(self.max_length)
         ])
         tgt_inputs = torch.stack([tgt_ids, tgt_key_padding_mask], dim=1)  # (N, 2, L)
-        return tgt_inputs
+        return tgt_inputs.long()
 
 
 class LabelsBuilder(DataBuilder):

@@ -5,16 +5,19 @@ they will be registered as buffers.
 import torch
 
 
-def all_mask(max_length: int) -> torch.BoolTensor:
-    mask = torch.ones(size=(max_length, max_length)).bool()
+def no_mask(max_length: int) -> torch.LongTensor:
+    """
+    Just allow all positions
+    """
+    mask = torch.zeros(size=(max_length, max_length)).long()
     return mask
 
 
-def subsequent_mask(max_length: int) -> torch.BoolTensor:
+def subsequent_mask(max_length: int) -> torch.LongTensor:
     """
-    :return: (L, L)
+    Subsequently allow positions
     """
-    mask = torch.tril(all_mask(max_length), diagonal=0).bool()  # (L, L) -> (L, L)
+    mask = torch.triu(torch.ones(size=(max_length, max_length)), diagonal=1).long()  # (L, L) -> (L, L)
     return mask
 
 

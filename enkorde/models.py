@@ -175,7 +175,7 @@ class TransformerTorch(TransformerBase):
                                                 batch_first=True,
                                                 device=device)
         # --- register subsequent masks here --- #
-        self.register_buffer("all_mask", tensors.all_mask(max_length))  # (L, L)
+        self.register_buffer("no_mask", tensors.no_mask(max_length))  # (L, L)
         self.register_buffer("subsequent_mask", tensors.subsequent_mask(max_length))  # (L, L)
 
     def forward(self, src_ids: torch.Tensor, tgt_ids: torch.Tensor,
@@ -184,11 +184,7 @@ class TransformerTorch(TransformerBase):
         pos_encodings = self.pos_encodings.unsqueeze(0).expand(N, -1, -1)  # (L, H) -> (1, L, H) -> (N, L, H)
         src = self.token_embeddings(src_ids) + pos_encodings  # (N, L, H) + (N, L, H) -> (N, L, H)
         tgt = self.token_embeddings(tgt_ids) + pos_encodings  # (N, L, H) + (N, L, H) -> (N, L, H)
-        # build subsequent masks here
-        src_mask = self.all_mask.unsqueeze(0).expand(N * self.heads, -1, -1)  # (L, L) -> (1, L, L) -> (N, L, L)
-        tgt_mask = self.subsequent_mask.unsqueeze(0).expand(N * self.heads, -1, -1)  # (L, L) -> (1, L, L) -> (N, L, L)
-        # ...  -> (N, L, H)
-        hidden = self.transformer.forward(src, tgt, src_mask=src_mask, tgt_mask=tgt_mask,
+        hidden = self.transformer.forward(src, tgt, src_mask=self.no_mask.bool(), tgt_mask=self.subsequent_mask.bool(),
                                           src_key_padding_mask=src_key_padding_mask,
                                           tgt_key_padding_mask=tgt_key_padding_mask)
         return hidden
@@ -205,7 +201,7 @@ class TransformerScratch(TransformerBase):
         self.decoder = Decoder(hidden_size, ffn_size, max_length, heads, depth, dropout)  # the decoder stack
 
     def forward(self, src_ids: torch.Tensor, tgt_ids: torch.Tensor,
-                src_key_padding_mask: torch.BoolTensor, tgt_key_padding_mask: torch.BoolTensor) -> torch.Tensor:
+                src_key_padding_mask: torch.LongTensor, tgt_key_padding_mask: torch.LongTensor) -> torch.Tensor:
         """
         :param: src_ids (N, L)
         :param: tgt_ids (N, L)
@@ -252,7 +248,7 @@ class EncoderLayer(torch.nn.Module):
         self.ffn = FeedForward(hidden_size, ffn_size, dropout)
         self.layer_norm_2 = torch.nn.LayerNorm(hidden_size)
 
-    def forward(self, x: torch.Tensor, x_key_padding_mask: torch.BoolTensor) -> torch.Tensor:
+    def forward(self, x: torch.Tensor, x_key_padding_mask: torch.LongTensor) -> torch.Tensor:
         """
         :param x (N, L, H)
         :param x_key_padding_mask (N, L)
@@ -274,7 +270,7 @@ class Encoder(torch.nn.Module):
             for _ in range(depth)
         ])
 
-    def forward(self, x: torch.Tensor, x_key_padding_mask: torch.BoolTensor) -> torch.Tensor:
+    def forward(self, x: torch.Tensor, x_key_padding_mask: torch.LongTensor) -> torch.Tensor:
         """
         :param x: (N, L, H)
         :param x_key_padding_mask: (N, L)
@@ -299,7 +295,7 @@ class DecoderLayer(torch.nn.Module):
         self.layer_norm_3 = torch.nn.LayerNorm(hidden_size)
 
     def forward(self, x: torch.Tensor, memory: torch.Tensor,
-                x_key_padding_mask: torch.BoolTensor, memory_key_padding_mask: torch.BoolTensor) -> torch.Tensor:
+                x_key_padding_mask: torch.LongTensor, memory_key_padding_mask: torch.LongTensor) -> torch.Tensor:
         """
         :param: x (N, L, H)
         :param: memory (the output of the encoder) (N, L, H)
@@ -373,7 +369,7 @@ class MultiHeadAttentionLayer(torch.nn.Module):
         self.register_buffer("subsequent_mask", tensors.subsequent_mask(max_length))
 
     def forward(self, q: torch.Tensor, k: torch.Tensor, v: torch.Tensor,
-                key_padding_mask: torch.BoolTensor) -> torch.Tensor:
+                key_padding_mask: torch.LongTensor) -> torch.Tensor:
         """
         :param q: (N, L, H)
         :param k: (N, L, H)
@@ -396,7 +392,7 @@ class MultiHeadAttentionLayer(torch.nn.Module):
                                                q: torch.Tensor,
                                                k: torch.Tensor,
                                                v: torch.Tensor,
-                                               key_padding_mask: torch.BoolTensor) -> torch.Tensor:
+                                               key_padding_mask: torch.LongTensor) -> torch.Tensor:
         """
          # --- einsum symbols --- #
          n = N
@@ -429,7 +425,7 @@ class MultiHeadAttentionLayer(torch.nn.Module):
         sims = torch.einsum("nhqs,nhks->nhqk", q, k)
         # the padded tokens are masked
         # (N, L) -> (N, heads, L, L)
-        sims = sims.masked_fill(self.build_mask(key_padding_mask) == 0, float("-inf"))
+        sims = sims.masked_fill(self.build_mask(key_padding_mask) == 1, float("-inf"))
         # then normalise the sims to get the attention scores
         attentions = torch.softmax(sims, dim=3)  # (N, heads, L, L), normalise over keys
         # (N, heads, L, L) * (N, heads, L,  H // heads) -> (N, heads, L, H // heads)
@@ -446,7 +442,7 @@ class MultiHeadAttentionLayer(torch.nn.Module):
                            .view(N, L, self.hidden_size)
         return contexts
 
-    def build_mask(self, key_padding_mask: torch.BoolTensor) -> torch.LongTensor:
+    def build_mask(self, key_padding_mask: torch.LongTensor) -> torch.LongTensor:
         """
         combine the subsequent mask & key padding mask to build attention mask
         :param key_padding_mask: (N, L)
@@ -462,5 +458,9 @@ class MultiHeadAttentionLayer(torch.nn.Module):
             subsequent_mask = self.subsequent_mask.view(1, 1, L, L)\
                                                   .expand(N, self.heads, -1, -1)
             # (N, heads, L, L), (N, heads, L, L) -> (N, heads, L, L)
-            mask = torch.logical_and(mask, subsequent_mask).long()
+            # why logical_or, instead of logical_and?
+            # if a position is masked by any of the two masks, it must be ignored
+            # even if it is not masked by the other mask
+            # e.g. [0, 0, 1, 1, 1] or [0, 0, 0, 0, 1] = [0, 0, 1, 1, 1]
+            mask = torch.logical_or(mask, subsequent_mask).long()
         return mask

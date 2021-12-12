@@ -1,7 +1,7 @@
 # Enkorde
 [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/drive/181hTrhfbmyub7UaMJmBY_fbFfLBCBi58?usp=sharing)
 
-트랜스포머 밑바닥부터 구현 (광주인공지능사관학교/멋쟁이사자차럼 자연어처리 보충수업)
+Seq2Seq 트랜스포머 밑바닥부터 구현 (광주인공지능사관학교/멋쟁이사자차럼 자연어처리 보충수업)
 
 ## Quick Start
 

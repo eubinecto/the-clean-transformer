@@ -1,6 +1,5 @@
 import torch
 import numpy as np
-from argparse import Namespace
 from typing import Tuple, List
 from pytorch_lightning import LightningModule
 from torchmetrics import Accuracy
@@ -28,18 +27,9 @@ class Transformer(LightningModule):
     def __init__(self, implementation: str, hidden_size: int, ffn_size: int,
                  vocab_size: int, max_length: int,
                  pad_token_id: int, heads: int, depth: int,
-                 dropout: float, lr: float):
+                 dropout: float, lr: float, beta_1: float, beta_2: float, eps: float, warmup_steps: int):  # noqa
         super().__init__()
-        self.save_hyperparameters(Namespace(implementation=implementation,
-                                            hidden_size=hidden_size,
-                                            ffn_size=ffn_size,
-                                            vocab_size=vocab_size,
-                                            max_length=max_length,
-                                            pad_token_id=pad_token_id,
-                                            heads=heads,
-                                            depth=depth,
-                                            dropout=dropout,
-                                            lr=lr))
+        self.save_hyperparameters()
         self.token_embeddings = torch.nn.Embedding(num_embeddings=vocab_size, embedding_dim=hidden_size)
         # --- choose the implementation for encoder-decoder --- #
         if implementation == EncoderDecoderTorch.name:
@@ -90,8 +80,8 @@ class Transformer(LightningModule):
     def predict(self, X: torch.Tensor) -> torch.Tensor:
         """
         auto-regressive inference
-        :param X: (N, 2, 2, L)
-        :return: (N, L)
+        :param X (N, 2, 2, L)
+        :return pred_ids (N, L)
         """
         src_ids, src_key_padding_mask = X[:, 0, 0], X[:, 0, 1]
         tgt_ids, tgt_key_padding_mask = X[:, 1, 0], X[:, 1, 1]
@@ -106,15 +96,17 @@ class Transformer(LightningModule):
             # To keep things simple, we just use "greedy decoding" (just choose the tokens with the highest probability)
             # Ideally, you would want a decoding strategy that is more sophisticated than that (e.g. beam search)
             # for more information on decoding strategy - refer to: https://huggingface.co/blog/how-to-generate
-            pred_ids = torch.argmax(probs, dim=2)  # (N, L, |V|) -> (N, L)
+            ids = torch.argmax(probs, dim=2)  # (N, L, |V|) -> (N, L)
             # use the pred_ids for this time step as the tgt_ids for the next time step
-            tgt_ids[:, t + 1] = pred_ids[:, t]
+            tgt_ids[:, t + 1] = ids[:, t]
             # next tgt_ids must not be ignored, so remove the mask for the next time step
             tgt_key_padding_mask[:, t + 1] = 0
         return tgt_ids
 
     def on_train_start(self):
-        # this is important!
+        # as for training deep neural nets, it is important to
+        # initialise weights with "xavier_uniform"
+        # http://proceedings.mlr.press/v9/glorot10a/glorot10a.pdf
         for param in tqdm(self.parameters(), desc="initialising weights..."):
             if param.dim() > 1:
                 torch.nn.init.xavier_uniform_(param)
@@ -162,14 +154,22 @@ class Transformer(LightningModule):
         self.acc_val.reset()
 
     def configure_optimizers(self) -> dict:
+        # "We used the Adam optimizer [20] with beta_1 = 0.9, beta_2 = 0:98 and eps = 10^(-9).
         optimizer = torch.optim.Adam(params=self.parameters(), lr=self.hparams['lr'],
-                                     betas=(0.9, 0.98), eps=1e-9)
-        # what schedulers to use? : https://gaussian37.github.io/dl-pytorch-lr_scheduler/
-        scheduler = lr_scheduler.ReduceLROnPlateau(optimizer, mode="min", patience=10, verbose=True)
+                                     betas=(self.hparams['beta_1'], self.hparams['beta_2']),
+                                     eps=self.hparams['eps'])
+        # We varied the learning rate over the course of training, according to the formula"
+        scheduler = lr_scheduler.LambdaLR(
+            optimizer,
+            # refer to pg.7 of the paper
+            lr_lambda=lambda epoch:
+            self.hparams['hidden_size']**(-0.5) * min((epoch + 1)**(-0.5),
+                                                      (epoch + 1) * self.hparams['warmup_steps']**(-1.5))
+        )
+        # want to checkout a different scheduler? : https://gaussian37.github.io/dl-pytorch-lr_scheduler/
         return {
             'optimizer': optimizer,
             'lr_scheduler': scheduler,
-            'monitor': "Train/Average Loss"  # better monitor the accuracy
         }
 
 
@@ -202,8 +202,10 @@ class EncoderDecoderTorch(torch.nn.Module):
         :param: tgt_key_padding_mask (N, L)
         :return hidden: (N, L, H)
         """
-        N, L, _ = src.size()
-        pos_encodings = self.pos_encodings.unsqueeze(0).expand(N, L, -1)  # (L, H) -> (1, L, H) -> (N, L, H)
+        N, _, _ = src.size()  # (N, L, H)
+        # "Passing -1 as the size for a dimension means not changing the size of that dimension."
+        # https://pytorch.org/docs/stable/generated/torch.Tensor.expand.html
+        pos_encodings = self.pos_encodings.unsqueeze(0).expand(N, -1, -1)  # (L, H) -> (1, L, H) -> (N, L, H)
         # --- encode positions ---  #
         src = src + pos_encodings  # (N, L, H) + (N, L, H) -> (N, L, H)
         tgt = tgt + pos_encodings  # (N, L, H) + (N, L, H) -> (N, L, H)
@@ -240,8 +242,10 @@ class EncoderDecoderScratch(torch.nn.Module):
         :param: tgt_key_padding_mask (N, L)
         :return hidden: (N, L, H)
         """
-        N, L, _ = src.size()  # (N, L)
-        pos_encodings = self.pos_encodings.unsqueeze(0).expand(N, L, -1)  # (L, H) -> (1, L, H) -> (N, L, H)
+        N, _, _ = src.size()  # (N, L, H)
+        # "Passing -1 as the size for a dimension means not changing the size of that dimension."
+        # https://pytorch.org/docs/stable/generated/torch.Tensor.expand.html
+        pos_encodings = self.pos_encodings.unsqueeze(0).expand(N, -1, -1)  # (L, H) -> (1, L, H) -> (N, L, H)
         # --- encode positions --- #
         src = src + pos_encodings  # (N, L, H) + (N, L, H) -> (N, L, H)
         tgt = tgt + pos_encodings  # (N, L, H) + (N, L, H) -> (N, L, H)
@@ -275,9 +279,10 @@ class FeedForward(torch.nn.Module):
 class EncoderLayer(torch.nn.Module):
     def __init__(self, hidden_size: int, ffn_size: int, max_length: int, heads: int, dropout: float):
         super().__init__()
-        # any layers to optimise?
+        # not masked, multi-head self-attention layer
         self.mhsa_layer = MultiHeadAttentionLayer(hidden_size, max_length, heads, masked=False)
         self.layer_norm_1 = torch.nn.LayerNorm(hidden_size)
+        # position-wise feedforward network
         self.ffn = FeedForward(hidden_size, ffn_size, dropout)
         self.layer_norm_2 = torch.nn.LayerNorm(hidden_size)
 
@@ -285,19 +290,21 @@ class EncoderLayer(torch.nn.Module):
         """
         :param x (N, L, H)
         :param x_key_padding_mask (N, L)
-        :return: src_hidden: (N, L, H)
+        :return: x(contextualised): (N, L, H)
         """
-        # multi-head self-attention layer (mhsa)
-        x = self.mhsa_layer.forward(q=x, k=x, v=x, key_padding_mask=x_key_padding_mask) + x
+        x = self.mhsa_layer.forward(q=x, k=x, v=x, key_padding_mask=x_key_padding_mask) + x  # residual
         x = self.layer_norm_1(x)
-        x = self.ffn(x) + x
-        x = self.layer_norm_2(x)  # src_hidden is now updated
+        x = self.ffn(x) + x  # residual
+        x = self.layer_norm_2(x)
         return x
 
 
 class Encoder(torch.nn.Module):
     def __init__(self, hidden_size: int, ffn_size: int, max_length: int, heads: int, depth: int, dropout: float):
         super().__init__()
+        # why use ModuleList, rather than a python list?
+        # A: because moduleLists are visible to Module methods but python lists are not.  (e.g. self.parameters())
+        # refer to: https://pytorch.org/docs/stable/generated/torch.nn.ModuleList.html
         self.layers = torch.nn.ModuleList([
             EncoderLayer(hidden_size, ffn_size, max_length, heads, dropout)
             for _ in range(depth)
@@ -307,7 +314,7 @@ class Encoder(torch.nn.Module):
         """
         :param x: (N, L, H)
         :param x_key_padding_mask: (N, L)
-        :return: src_hidden: (N, L, H)
+        :return: x(contextualised): (N, L, H)
         """
         for layer in self.layers:
             x = layer(x, x_key_padding_mask)
@@ -334,16 +341,15 @@ class DecoderLayer(torch.nn.Module):
         :param: memory (the output of the encoder) (N, L, H)
         :param: x_key_padding_mask  (N, L)
         :param: memory_mask (N, L)
-        :return: x (updated)
+        :return: x (contextualised)
         """
         # --- contextualise
-        x = self.masked_mhsa_layer.forward(q=x, k=x, v=x, key_padding_mask=x_key_padding_mask) + x
+        x = self.masked_mhsa_layer.forward(q=x, k=x, v=x, key_padding_mask=x_key_padding_mask) + x  # residual
         x = self.layer_norm_1(x)
-        x = self.mheda_layer.forward(q=x, k=memory, v=memory, key_padding_mask=memory_key_padding_mask) + x
+        x = self.mheda_layer.forward(q=x, k=memory, v=memory, key_padding_mask=memory_key_padding_mask) + x  # residual
         x = self.layer_norm_2(x)
-        x = self.ffn(x) + x
-        x = self.layer_norm_3(x)  # x updated
-        # what exactly are you updating? aren't you updating the source hidden?
+        x = self.ffn(x) + x  # residual
+        x = self.layer_norm_3(x)
         return x
 
 
@@ -351,9 +357,6 @@ class Decoder(torch.nn.Module):
 
     def __init__(self, hidden_size: int, ffn_size: int, max_length: int, heads: int, depth: int, dropout: float):
         super().__init__()
-        # why use ModuleList, rather than a python list?
-        # A: because moduleLists are visible to Module methods but python lists are not.  (e.g. self.parameters())
-        # refer to: https://pytorch.org/docs/stable/generated/torch.nn.ModuleList.html
         self.layers = torch.nn.ModuleList([
             DecoderLayer(hidden_size, ffn_size, max_length, heads, dropout)
             for _ in range(depth)
@@ -366,7 +369,7 @@ class Decoder(torch.nn.Module):
         :param: memory (N, L, H)
         :param: mask  (N, L)
         :param: memory_mask (N, L)
-        :return: H_y: (N, L, H)
+        :return: x(contextualised): (N, L, H)
         """
         for layer in self.layers:
             x = layer(x, memory, x_key_padding_mask, memory_key_padding_mask)
@@ -380,11 +383,11 @@ class MultiHeadAttentionLayer(torch.nn.Module):
 
     def __init__(self, hidden_size: int, max_length: int, heads: int, masked: bool):
         """
-        :param hidden_size:
-        :param max_length:
+        :param hidden_size
+        :param max_length
         :param heads: the number of heads
         :param masked: set this to True if you want to apply subsequent mask as well as padding mask to
-        a query-key similarity matrix, or False if you want to apply padding mask only to the matrix
+        a query-key similarity matrix, False if you want to apply only the padding mask to the matrix
         """
         super().__init__()
         self.hidden_size = hidden_size
@@ -408,7 +411,7 @@ class MultiHeadAttentionLayer(torch.nn.Module):
         :param k: (N, L, H)
         :param v: (N, L, H)
         :param key_padding_mask (N, L)
-        :return: hiddens (N, L, H)
+        :return: contexts (N, L, H)
         """
         N, _, _ = q.size()
         # --- learn patterns from q, k, v --- #
@@ -417,9 +420,9 @@ class MultiHeadAttentionLayer(torch.nn.Module):
         v = self.linear_v(v)  # (N, L, H) * (H, H) -> (N, L, H)
         # compute the scaled dot product attention,
         # which outputs "contexts" (i.e. query contextualised by key and value)
-        contexts = self.multihead_scaled_dot_product_attention(q, k, v, key_padding_mask)  # ... -> (N, L, H)
-        hiddens = self.linear_o(contexts)  # (N, L, H) * (H, H) -> (N, L, H)
-        return hiddens
+        concats = self.multihead_scaled_dot_product_attention(q, k, v, key_padding_mask)  # ... -> (N, L, H)
+        contexts = self.linear_o(concats)  # (N, L, H) * (H, H) -> (N, L, H)
+        return contexts
 
     def multihead_scaled_dot_product_attention(self,
                                                q: torch.Tensor,
@@ -470,10 +473,10 @@ class MultiHeadAttentionLayer(torch.nn.Module):
         # A: so that we properly "concatenate" heads & H // heads dimension to hidden_size
         # why should you call contiguous after transpose and before view?
         # A: https://stackoverflow.com/a/52229694
-        contexts = contexts.transpose(1, 2) \
-                           .contiguous() \
-                           .view(N, L, self.hidden_size)
-        return contexts
+        concats = contexts.transpose(1, 2) \
+                          .contiguous() \
+                          .view(N, L, self.hidden_size)
+        return concats
 
     def build_mask(self, key_padding_mask: torch.LongTensor) -> torch.LongTensor:
         """

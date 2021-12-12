@@ -36,7 +36,8 @@ def main():
                                   config['heads'],
                                   config['depth'],
                                   config['dropout'],
-                                  config['lr'])
+                                  float(config['lr']), config['beta_1'], config['beta_2'],
+                                  float(config['eps']), config['warmup_steps'])
         # --- choose the data --- #
         if config['data'] == Kor2EngDataModule.name:
             datamodule = Kor2EngDataModule(config, tokenizer)

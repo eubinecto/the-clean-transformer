@@ -10,11 +10,11 @@
 ## Quick Start
 우선, 리포를 클론하고 가상환경을 구축합니다:
 ```shell
-git clone https://github.com/eubinecto/enkorde.git
-conda create -n enkorde python=3.9 
-conda activate enkorde
+git clone https://github.com/eubinecto/the-clean-transformer.git
+conda create -n cleanformer python=3.9 
+conda activate cleanformer
 conda install pip
-cd enkorde
+cd cleanformer
 pip install -r requirements.txt
 ```
 

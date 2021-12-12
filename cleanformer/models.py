@@ -37,7 +37,7 @@ class Transformer(LightningModule):
         :param tgt_ids (N, L)
         :param src_key_padding_mask: (N, L)
         :param tgt_key_padding_mask: (N, L)
-        :return (N, L, H)
+        :return hidden (N, L, H)
         """
         N, L = src_ids.size()  # (N, L)
         pos_encodings = self.pos_encodings.unsqueeze(0).expand(N, L, -1)  # (L, H) -> (1, L, H) -> (N, L, H)
@@ -52,9 +52,14 @@ class Transformer(LightningModule):
         hidden = self.decoder.forward(tgt, memory, tgt_key_padding_mask, src_key_padding_mask)  # ... (N, L, H)
         return hidden
 
-    def step(self, X: torch.Tensor, y: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor]:
-        src_ids, src_key_padding_mask = X[:, 0, 0], X[:, 0, 1]
-        tgt_ids, tgt_key_padding_mask = X[:, 1, 0], X[:, 1, 1]
+    def step(self, X: torch.Tensor, Y: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor]:
+        """
+        :param X (N, 2, 2, L)
+        :param Y (N, L)
+        :return loss (,)
+        """
+        src_ids, src_key_padding_mask = X[:, 0, 0], X[:, 0, 1]  # (N, 2, 2, L) -> (N, L), (N, L)
+        tgt_ids, tgt_key_padding_mask = X[:, 1, 0], X[:, 1, 1]  # (N, 2, 2, L) -> (N, L), (N, L)
         hidden = self.forward(src_ids, tgt_ids, src_key_padding_mask, tgt_key_padding_mask)  # ... -> (N, L, H)
         # use the embedding table as the pre-softmax linear transformation (i.e. a token classifier)
         # "In our model, we share the same weight matrix between the two embedding layers and the pre-softmax
@@ -66,7 +71,7 @@ class Transformer(LightningModule):
         logits = torch.einsum("nlh,vh->nvl", hidden, cls)  # (N, |V|, L)
         # (N, |V|, L), (N, L) -> (N, 1) -> (1)
         # the lengths are different  -> pad should not be ignored
-        loss = F.cross_entropy(logits, y, ignore_index=self.hparams['pad_token_id']).sum()
+        loss = F.cross_entropy(logits, Y, ignore_index=self.hparams['pad_token_id']).sum()
         return loss, logits
 
     def predict(self, X: torch.Tensor) -> torch.Tensor:
@@ -75,8 +80,8 @@ class Transformer(LightningModule):
         :param X: (N, 2, 2, L)
         :return: (N, L)
         """
-        src_ids, src_key_padding_mask = X[:, 0, 0], X[:, 0, 1]
-        tgt_ids, tgt_key_padding_mask = X[:, 1, 0], X[:, 1, 1]
+        src_ids, src_key_padding_mask = X[:, 0, 0], X[:, 0, 1]  # (N, 2, 2, L) -> (N, L), (N, L)
+        tgt_ids, tgt_key_padding_mask = X[:, 1, 0], X[:, 1, 1]  # (N, 2, 2, L) -> (N, L), (N, L)
         # run an autoregressive inference
         # refer to Alammar's amazing blog post: https://jalammar.github.io/illustrated-transformer/
         # in particular, this gif: https://jalammar.github.io/images/t/transformer_decoding_2.gif
@@ -96,7 +101,8 @@ class Transformer(LightningModule):
         return tgt_ids
 
     def on_train_start(self):
-        # this is important!
+        # many deep transformer models are initialised with so-called "Xavier initialisation"
+        # refer to: https://proceedings.mlr.press/v9/glorot10a/glorot10a.pdf
         for param in tqdm(self.parameters(), desc="initialising weights..."):
             if param.dim() > 1:
                 torch.nn.init.xavier_uniform_(param)
@@ -104,11 +110,16 @@ class Transformer(LightningModule):
     def training_step(self, batch: Tuple[torch.Tensor, torch.Tensor], *args, **kwargs) -> dict:
         """
         A function for computing the loss for this batch.
-        :return: a scalar tensor
+        :return: a scalar tensor containing the loss for this batch
         """
-        X, y = batch
-        loss, logits = self.step(X, y)
-        self.acc_train.update(logits.detach(), target=y.detach())
+        X, Y = batch
+        loss, logits = self.step(X, Y)
+        # why detach then?
+        # A: here, we need them not for computing loss, but for computing accuracies.
+        # so, it's okay to detach the tensors from computation graph, thus saving some space in GPU
+        # (i.e. prevent "coda out of memory error")
+        # https://discuss.pytorch.org/t/cuda-out-of-memory-during-training/85014/2
+        self.acc_train.update(logits.detach(), target=Y.detach())
         return {
             'loss': loss
         }
@@ -117,8 +128,6 @@ class Transformer(LightningModule):
         self.log("Train/Loss", outputs['loss'])
 
     def training_epoch_end(self, outputs: List[dict]) -> None:
-        # to see an average performance over the batches in this specific epoch
-        # why detach? ->  https://discuss.pytorch.org/t/cuda-out-of-memory-during-training/85014/2
         avg_loss = torch.stack([output['loss'] for output in outputs]).mean()
         self.log("Train/Average Loss", avg_loss)
         self.log("Train/Accuracy", self.acc_train.compute())
@@ -136,8 +145,6 @@ class Transformer(LightningModule):
         self.log("Validation/Loss", outputs['loss'])
 
     def validation_epoch_end(self, outputs: List[dict]) -> None:
-        # to see an average performance over the batches in this specific epoch
-        # why detach? ->  https://discuss.pytorch.org/t/cuda-out-of-memory-during-training/85014/2
         avg_loss = torch.stack([output['loss'] for output in outputs]).mean()
         self.log("Validation/Average Loss", avg_loss)
         self.log("Validation/Accuracy", self.acc_val.compute())
@@ -178,20 +185,21 @@ class FeedForward(torch.nn.Module):
             torch.nn.Dropout(dropout)
         )
 
-    def forward(self, hiddens: torch.Tensor):
+    def forward(self, x: torch.Tensor):
         """
-        :param hiddens: (N, L, H)
-        :return: H_all: (N, L, H)
+        :param x: (N, L, H)
+        :return: x (hidden): (N, L, H)
         """
-        return self.layers(hiddens)
+        return self.layers(x)
 
 
 class EncoderLayer(torch.nn.Module):
     def __init__(self, hidden_size: int, ffn_size: int, max_length: int, heads: int, dropout: float):
         super().__init__()
-        # any layers to optimise?
+        # not masked, multi-head self-attention layer
         self.mhsa_layer = MultiHeadAttentionLayer(hidden_size, max_length, heads, masked=False)
         self.layer_norm_1 = torch.nn.LayerNorm(hidden_size)
+        # position-wise feedforward network
         self.ffn = FeedForward(hidden_size, ffn_size, dropout)
         self.layer_norm_2 = torch.nn.LayerNorm(hidden_size)
 
@@ -201,10 +209,10 @@ class EncoderLayer(torch.nn.Module):
         :param x_key_padding_mask (N, L)
         :return: src_hidden: (N, L, H)
         """
-        # multi-head self-attention layer (mhsa)
-        x = self.mhsa_layer.forward(q=x, k=x, v=x, key_padding_mask=x_key_padding_mask) + x
+        # contextualised x with itself
+        x = self.mhsa_layer.forward(q=x, k=x, v=x, key_padding_mask=x_key_padding_mask) + x  # residual
         x = self.layer_norm_1(x)
-        x = self.ffn(x) + x
+        x = self.ffn(x) + x  # residual
         x = self.layer_norm_2(x)  # src_hidden is now updated
         return x
 
@@ -221,7 +229,7 @@ class Encoder(torch.nn.Module):
         """
         :param x: (N, L, H)
         :param x_key_padding_mask: (N, L)
-        :return: src_hidden: (N, L, H)
+        :return: x (contextualised): (N, L, H)
         """
         for layer in self.layers:
             x = layer(x, x_key_padding_mask)
@@ -248,16 +256,16 @@ class DecoderLayer(torch.nn.Module):
         :param: memory (the output of the encoder) (N, L, H)
         :param: x_key_padding_mask  (N, L)
         :param: memory_mask (N, L)
-        :return: x (updated)
+        :return: x (contextualised)
         """
-        # --- contextualise
-        x = self.masked_mhsa_layer.forward(q=x, k=x, v=x, key_padding_mask=x_key_padding_mask) + x
+        # contextualised x with itself
+        x = self.masked_mhsa_layer.forward(q=x, k=x, v=x, key_padding_mask=x_key_padding_mask) + x  # residual
         x = self.layer_norm_1(x)
-        x = self.mheda_layer.forward(q=x, k=memory, v=memory, key_padding_mask=memory_key_padding_mask) + x
+        # contextualised x with memory
+        x = self.mheda_layer.forward(q=x, k=memory, v=memory, key_padding_mask=memory_key_padding_mask) + x  # residual
         x = self.layer_norm_2(x)
-        x = self.ffn(x) + x
-        x = self.layer_norm_3(x)  # x updated
-        # what exactly are you updating? aren't you updating the source hidden?
+        x = self.ffn(x) + x  # residual
+        x = self.layer_norm_3(x)
         return x
 
 
@@ -278,9 +286,9 @@ class Decoder(torch.nn.Module):
         """
         :param: x (N, L, H)
         :param: memory (N, L, H)
-        :param: mask  (N, L)
-        :param: memory_mask (N, L)
-        :return: H_y: (N, L, H)
+        :param: x_key_padding_mask  (N, L)
+        :param: memory_key_padding_mask (N, L)
+        :return: x (contextualised): (N, L, H)
         """
         for layer in self.layers:
             x = layer(x, memory, x_key_padding_mask, memory_key_padding_mask)
@@ -298,7 +306,7 @@ class MultiHeadAttentionLayer(torch.nn.Module):
         :param max_length:
         :param heads: the number of heads
         :param masked: set this to True if you want to apply subsequent mask as well as padding mask to
-        a query-key similarity matrix, or False if you want to apply padding mask only to the matrix
+        a query-key similarity matrix, False if you want to apply only the padding mask to the matrix
         """
         super().__init__()
         self.hidden_size = hidden_size
@@ -322,18 +330,14 @@ class MultiHeadAttentionLayer(torch.nn.Module):
         :param k: (N, L, H)
         :param v: (N, L, H)
         :param key_padding_mask (N, L)
-        :return: hiddens (N, L, H)
+        :return: contexts (N, L, H)
         """
         N, _, _ = q.size()
-        # --- learn patterns from q, k, v --- #
         q = self.linear_q(q)  # (N, L, H) * (H, H) -> (N, L, H)
         k = self.linear_k(k)  # (N, L, H) * (H, H) -> (N, L, H)
         v = self.linear_v(v)  # (N, L, H) * (H, H) -> (N, L, H)
-        # compute the scaled dot product attention,
-        # which outputs "contexts" (i.e. query contextualised by key and value)
         contexts = self.multihead_scaled_dot_product_attention(q, k, v, key_padding_mask)  # ... -> (N, L, H)
-        hiddens = self.linear_o(contexts)  # (N, L, H) * (H, H) -> (N, L, H)
-        return hiddens
+        return contexts
 
     def multihead_scaled_dot_product_attention(self,
                                                q: torch.Tensor,
@@ -350,7 +354,7 @@ class MultiHeadAttentionLayer(torch.nn.Module):
         :param k: (N, L, H)
         :param v: (N, L, H)
         :param key_padding_mask (N, L)
-        :return: concats (N, L, H)
+        :return: contexts (N, L, H)
         """
         N, L, _ = q.size()
         # --- split Q, K, V into multi-heads --- #
@@ -384,14 +388,16 @@ class MultiHeadAttentionLayer(torch.nn.Module):
         # A: so that we properly "concatenate" heads & H // heads dimension to hidden_size
         # why should you call contiguous after transpose and before view?
         # A: https://stackoverflow.com/a/52229694
-        contexts = contexts.transpose(1, 2) \
-                           .contiguous() \
-                           .view(N, L, self.hidden_size)
+        concats = contexts.transpose(1, 2) \
+                          .contiguous() \
+                          .view(N, L, self.hidden_size)
+        # join the concatenated contexts
+        contexts = self.linear_o(concats)  # (N, L, H) * (H, H) -> (N, L, H)
         return contexts
 
     def build_mask(self, key_padding_mask: torch.LongTensor) -> torch.LongTensor:
         """
-        combine the subsequent mask & key padding mask to build attention mask
+        combine the subsequent mask & key padding mask to build the mask
         :param key_padding_mask: (N, L)
         :return: mask (N,heads, L, L)
         """

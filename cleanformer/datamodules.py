@@ -15,16 +15,16 @@ from cleanformer.fetchers import fetch_kor2eng
 os.environ["TOKENIZERS_PARALLELISM"] = "true"
 
 
-class DekordeDataset(Dataset):
-    def __init__(self, X: torch.Tensor, y: torch.Tensor):
-        self.X = X
-        self.y = y
+class CleanformerDataset(Dataset):
+    def __init__(self, X: torch.Tensor, Y: torch.Tensor):
+        self.X = X  # (N, 2, 2, L)
+        self.Y = Y  # (N, L)
 
     def __getitem__(self, index: int) -> Tuple[torch.Tensor, torch.Tensor]:
-        return self.X[index], self.y[index]
+        return self.X[index], self.Y[index]
 
     def __len__(self) -> int:
-        N, _ = self.y.size()
+        N, _ = self.Y.size()
         return N
 
 
@@ -43,13 +43,13 @@ class Kor2EngDataModule(LightningDataModule):
     def prepare_data(self) -> None:
         self.kor2eng_train, self.kor2eng_val, self.kor2eng_test = fetch_kor2eng()
 
-    def build_dataset(self, src2tgt: List[Tuple[str, str]]) -> Dataset:
+    def build_dataset(self, src2tgt: List[Tuple[str, str]]) -> CleanformerDataset:
         srcs = [src for src, _ in src2tgt]
         tgts = [tgt for _, tgt in src2tgt]
         X = TrainInputsBuilder(self.tokenizer, self.config['max_length'])(srcs=srcs, tgts=tgts)  # (N, L)
-        y = LabelsBuilder(self.tokenizer, self.config['max_length'])(tgts=tgts)  # (N, L)
+        Y = LabelsBuilder(self.tokenizer, self.config['max_length'])(tgts=tgts)  # (N, L)
         # to save gpu memory
-        return DekordeDataset(X, y)  # noqa
+        return CleanformerDataset(X, Y)  # noqa
 
     def train_dataloader(self) -> DataLoader:
         return DataLoader(self.build_dataset(self.kor2eng_train), batch_size=self.config['batch_size'],

@@ -3,9 +3,8 @@ from enkorde.fetchers import fetch_tokenizer, fetch_config
 
 
 def main():
-    model = "transformer_torch"
     ver = "overfit_small"
-    config = fetch_config()['train'][model][ver]
+    config = fetch_config()['train'][ver]
     config.update({'num_workers': 2})
     datamodule = Kor2EngSmallDataModule(config, None)  # noqa
     datamodule.prepare_data()

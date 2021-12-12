@@ -19,7 +19,7 @@ pip install -r requirements.txt
 사전학습된 모델을 다운로드 하기 위해선 반드시 첫번째 인자 (`entity`)로 `eubinecto`를 넣어야 합니다.
 추가로 영어로 번역하고자 하는 한국어 문장을 `--kor` 인자로 넣어줍니다. 
 ```shell
-python3 main_infer.py eubinecto --kor="그러나 이것은 또한 책상도 필요로 하지 않는다."
+python3 main_infer.py eubinecto --kor="카페인은 원래 커피에 들어있는 물질이다."
 ```
 
 위 스크립트를 실행하면, 다음과 같은 선택창이 뜹니다:

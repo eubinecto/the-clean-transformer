@@ -5,7 +5,7 @@ import argparse
 from pytorch_lightning.callbacks import LearningRateMonitor
 from pytorch_lightning.loggers import WandbLogger
 from pytorch_lightning import Trainer
-from enkorde.models import TransformerTorch, TransformerScratch
+from enkorde.models import Transformer
 from enkorde.fetchers import fetch_tokenizer, fetch_config
 from enkorde.paths import ROOT_DIR
 from enkorde.datamodules import Kor2EngDataModule, Kor2EngSmallDataModule
@@ -14,50 +14,29 @@ from enkorde.datamodules import Kor2EngDataModule, Kor2EngSmallDataModule
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("entity", type=str)
-    parser.add_argument("--model", type=str, default="transformer_torch")
-    parser.add_argument("--ver", type=str, default="overfit")
+    parser.add_argument("--ver", type=str, default="overfit_small_scratch")
     parser.add_argument("--num_workers", type=int, default=os.cpu_count())
     parser.add_argument("--log_every_n_steps", type=int, default=1)
     parser.add_argument("--fast_dev_run", action="store_true", default=False)
     parser.add_argument("--overfit_batches", type=int, default=0)
-    parser.add_argument("--check_val_every_n_epoch", type=int, default=1)
+    parser.add_argument("--check_val_every_n_epoch", type=int, default=5)
     args = parser.parse_args()
-    config = fetch_config()['train'][args.model][args.ver]
+    config = fetch_config()['train'][args.ver]
     config.update(vars(args))
     with wandb.init(entity=config['entity'], project="enkorde", config=config) as run:
         # --- fetch a pre-trained tokenizer from wandb -- #
         tokenizer = fetch_tokenizer(config['entity'], config['tokenizer'])
-        # --- choose the implementation of transformer to train --- #
-        if config['model'] == TransformerTorch.name:
-            # why do we need to provide a device?
-            # A: boilerplate; Pytorch's implementation does not register constant tensors to the buffer,
-            # so we must provide the device manually
-            device = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
-            transformer = TransformerTorch(config['hidden_size'],
-                                           config['ffn_size'],
-                                           tokenizer.get_vocab_size(),  # vocab_size
-                                           config['max_length'],
-                                           tokenizer.pad_token_id,  # noqa
-                                           config['heads'],
-                                           config['depth'],
-                                           config['dropout'],
-                                           config['lr'],
-                                           device)
-        elif config['model'] == TransformerScratch.name:
-            # why don't we provide a device to this module then?
-            # A: our implementation registers constant tensors to the buffer internally,
-            # so we don't need to provide device. pytorch-lightning does device loading for us.
-            transformer = TransformerScratch(config['hidden_size'],
-                                             config['ffn_size'],
-                                             tokenizer.get_vocab_size(),  # vocab_size
-                                             config['max_length'],
-                                             tokenizer.pad_token_id,  # noqa
-                                             config['heads'],
-                                             config['depth'],
-                                             config['dropout'],
-                                             config['lr'])
-        else:
-            raise ValueError(f"Invalid model: {config['model']}")
+        # --- instantiate the transformer to train --- #
+        transformer = Transformer(config['implementation'],
+                                  config['hidden_size'],
+                                  config['ffn_size'],
+                                  tokenizer.get_vocab_size(),  # vocab_size
+                                  config['max_length'],
+                                  tokenizer.pad_token_id,  # noqa
+                                  config['heads'],
+                                  config['depth'],
+                                  config['dropout'],
+                                  config['lr'])
         # --- choose the data --- #
         if config['data'] == Kor2EngDataModule.name:
             datamodule = Kor2EngDataModule(config, tokenizer)

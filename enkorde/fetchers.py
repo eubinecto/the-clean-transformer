@@ -2,15 +2,14 @@
 what does it mean by "fetch"?: https://www.quora.com/What-does-fetch-means-in-computer-science
 Korpora 에서도 fetch 라고 표현한다: https://github.com/ko-nlp/Korpora
 """
-import torch
 import wandb
 import yaml
 from os import path
 from typing import Tuple, List
 from Korpora import KoreanParallelKOENNewsKorpus
 from tokenizers import Tokenizer
-from enkorde.paths import CONFIG_YAML, KORPORA_DIR, TOKENIZER_DIR, TRANSFORMER_TORCH_DIR, TRANSFORMER_SCRATCH_DIR
-from enkorde.models import TransformerTorch, TransformerScratch, TransformerBase
+from enkorde.paths import CONFIG_YAML, KORPORA_DIR, tokenizer_dir, transformer_dir
+from enkorde.models import Transformer
 
 
 def fetch_kor2eng() -> Tuple[List[Tuple[str, str]],
@@ -29,7 +28,7 @@ def fetch_tokenizer(entity: str, ver: str) -> Tokenizer:
     artifact = api.artifact(f"{entity}/enkorde/tokenizer:{ver}", type="other")
     # use checkout instead of download to save space and simplify directory structures
     # https://docs.wandb.ai/ref/python/artifact#checkout
-    artifact_path = artifact.checkout(root=TOKENIZER_DIR)
+    artifact_path = artifact.download(root=tokenizer_dir(ver))
     json_path = path.join(artifact_path, "tokenizer.json")
     tokenizer = Tokenizer.from_file(json_path)
     # just manually register the special tokens
@@ -44,21 +43,12 @@ def fetch_tokenizer(entity: str, ver: str) -> Tokenizer:
     return tokenizer
 
 
-def fetch_transformer(entity: str, model: str, ver: str, device: torch.device = None)\
-        -> TransformerBase:
+def fetch_transformer(entity: str, ver: str) -> Transformer:
     api = wandb.Api()
-    if model == TransformerTorch.name:
-        artifact_path = api.artifact(f"{entity}/enkorde/{model}:{ver}", type="model") \
-                           .checkout(root=TRANSFORMER_TORCH_DIR)
-        ckpt_path = path.join(artifact_path, "transformer.ckpt")
-        transformer = TransformerTorch.load_from_checkpoint(ckpt_path, device=device)
-    elif model == TransformerScratch.name:
-        artifact_path = api.artifact(f"{entity}/enkorde/{model}:{ver}", type="model") \
-                           .checkout(root=TRANSFORMER_SCRATCH_DIR)
-        ckpt_path = path.join(artifact_path, "transformer.ckpt")
-        transformer = TransformerScratch.load_from_checkpoint(ckpt_path)
-    else:
-        raise ValueError(f"Invalid model: {model}")
+    artifact_path = api.artifact(f"{entity}/enkorde/transformer:{ver}", type="model") \
+                       .download(root=transformer_dir(ver))
+    ckpt_path = path.join(artifact_path, "transformer.ckpt")
+    transformer = Transformer.load_from_checkpoint(ckpt_path)
     return transformer
 
 

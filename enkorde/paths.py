@@ -12,6 +12,9 @@ CONFIG_YAML = os.path.join(ROOT_DIR, "config.yaml")
 
 
 # --- artifacts --- #
-TOKENIZER_DIR = os.path.join(ARTIFACTS_DIR, "tokenizer")
-TRANSFORMER_TORCH_DIR = os.path.join(ARTIFACTS_DIR, "transformer_torch")
-TRANSFORMER_SCRATCH_DIR = os.path.join(ARTIFACTS_DIR, "transformer_scratch")
+def tokenizer_dir(ver: str) -> str:
+    return os.path.join(ARTIFACTS_DIR, f"tokenizer:{ver}")
+
+
+def transformer_dir(ver: str) -> str:
+    return os.path.join(ARTIFACTS_DIR, f"transformer:{ver}")

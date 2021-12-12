@@ -3,7 +3,6 @@ import numpy as np
 from argparse import Namespace
 from typing import Tuple, List
 from pytorch_lightning import LightningModule
-from pytorch_lightning.utilities.types import EVAL_DATALOADERS, TRAIN_DATALOADERS
 from torchmetrics import Accuracy
 from torch.nn import functional as F
 from torch.optim import lr_scheduler
@@ -11,26 +10,28 @@ from tqdm import tqdm
 from enkorde import tensors
 
 
-class TransformerBase(LightningModule):
-    # just ignore these (boilerplate)
-    def train_dataloader(self) -> TRAIN_DATALOADERS:
+class Transformer(LightningModule):
+    # ---  just ignore these (boilerplate) --- #
+    def train_dataloader(self):
         pass
 
-    def test_dataloader(self) -> EVAL_DATALOADERS:
+    def test_dataloader(self):
         pass
 
-    def val_dataloader(self) -> EVAL_DATALOADERS:
+    def val_dataloader(self):
         pass
 
-    def predict_dataloader(self) -> EVAL_DATALOADERS:
+    def predict_dataloader(self):
         pass
+    # ----------------------------------------- #
 
-    def __init__(self, hidden_size: int, ffn_size: int,
+    def __init__(self, implementation: str, hidden_size: int, ffn_size: int,
                  vocab_size: int, max_length: int,
                  pad_token_id: int, heads: int, depth: int,
                  dropout: float, lr: float):
         super().__init__()
-        self.save_hyperparameters(Namespace(hidden_size=hidden_size,
+        self.save_hyperparameters(Namespace(implementation=implementation,
+                                            hidden_size=hidden_size,
                                             ffn_size=ffn_size,
                                             vocab_size=vocab_size,
                                             max_length=max_length,
@@ -40,24 +41,34 @@ class TransformerBase(LightningModule):
                                             dropout=dropout,
                                             lr=lr))
         self.token_embeddings = torch.nn.Embedding(num_embeddings=vocab_size, embedding_dim=hidden_size)
+        # --- choose the implementation for encoder-decoder --- #
+        if implementation == EncoderDecoderTorch.name:
+            device = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
+            self.enc_dec = EncoderDecoderTorch(hidden_size, ffn_size, max_length, heads, depth, dropout, device)
+        elif implementation == EncoderDecoderScratch.name:
+            self.enc_dec = EncoderDecoderScratch(hidden_size, ffn_size, max_length, heads, depth, dropout)
+        else:
+            raise ValueError(f"Invalid implementation: {implementation}")
         # --- metrics --- #
         # accuracies are rather inappropriate measure of translation quality, but let's just use them as the
         # metrics to keep it simple.
         self.acc_train = Accuracy(ignore_index=pad_token_id)
         self.acc_val = Accuracy(ignore_index=pad_token_id)
         self.acc_test = Accuracy(ignore_index=pad_token_id)
-        # --- we register any constant tensors to the buffer instead of using to(device) --- #
-        # this is to follow the best practice of multi-gpu training with pytorch-lightning
-        # https://pytorch-lightning.readthedocs.io/en/latest/advanced/multi_gpu.html#init-tensors-using-type-as-and-register-buffer
-        self.register_buffer("pos_encodings", tensors.pos_encodings(max_length, hidden_size))  # (L, H)
 
     def forward(self, src_ids: torch.Tensor, tgt_ids: torch.Tensor,
-                src_key_padding_mask: torch.Tensor, tgt_key_padding_mask: torch.Tensor) -> torch.Tensor:
+                src_key_padding_mask: torch.LongTensor, tgt_key_padding_mask: torch.LongTensor) -> torch.Tensor:
         """
-        This is to be implemented by either TransformerTorch or TransformerScratch
+        :param src_ids (N, L)
+        :param tgt_ids (N, L)
+        :param src_key_padding_mask: (N, L)
+        :param tgt_key_padding_mask: (N, L)
         :return (N, L, H)
         """
-        raise NotImplementedError
+        src = self.token_embeddings(src_ids)  # (N, L) -> (N, L, H)
+        tgt = self.token_embeddings(tgt_ids)  # (N, L) -> (N, L, H)
+        hidden = self.enc_dec.forward(src, tgt, src_key_padding_mask, tgt_key_padding_mask)
+        return hidden
 
     def step(self, X: torch.Tensor, y: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor]:
         src_ids, src_key_padding_mask = X[:, 0, 0], X[:, 0, 1]
@@ -162,14 +173,13 @@ class TransformerBase(LightningModule):
         }
 
 
-class TransformerTorch(TransformerBase):
-    name: str = "transformer_torch"
+class EncoderDecoderTorch(torch.nn.Module):
+    name: str = "torch"
 
-    def __init__(self, hidden_size: int, ffn_size: int, vocab_size: int, max_length: int, pad_token_id: int, heads: int,
-                 depth: int, dropout: float, lr: float, device: torch.device):
-        super().__init__(hidden_size, ffn_size, vocab_size, max_length, pad_token_id, heads, depth, dropout, lr)
+    def __init__(self, hidden_size: int, ffn_size: int, max_length: int, heads: int, depth: int, dropout: float,
+                 device: torch.device):
         # --- for reference, we just use a Pytorch's implementation of transformer --- #
-        self.heads = heads
+        super().__init__()
         self.transformer = torch.nn.Transformer(d_model=hidden_size,
                                                 nhead=heads,
                                                 num_encoder_layers=depth,
@@ -178,45 +188,64 @@ class TransformerTorch(TransformerBase):
                                                 dropout=dropout,
                                                 batch_first=True,
                                                 device=device)
-        # --- register subsequent masks here --- #
+        # --- register constant tensors here --- #
+        self.register_buffer("pos_encodings", tensors.pos_encodings(max_length, hidden_size))  # (L, H)
         self.register_buffer("no_mask", tensors.no_mask(max_length))  # (L, L)
         self.register_buffer("subsequent_mask", tensors.subsequent_mask(max_length))  # (L, L)
 
-    def forward(self, src_ids: torch.Tensor, tgt_ids: torch.Tensor,
+    def forward(self, src: torch.Tensor, tgt: torch.Tensor,
                 src_key_padding_mask: torch.Tensor, tgt_key_padding_mask: torch.Tensor) -> torch.Tensor:
-        N, _ = src_ids.size()
-        pos_encodings = self.pos_encodings.unsqueeze(0).expand(N, -1, -1)  # (L, H) -> (1, L, H) -> (N, L, H)
-        src = self.token_embeddings(src_ids) + pos_encodings  # (N, L, H) + (N, L, H) -> (N, L, H)
-        tgt = self.token_embeddings(tgt_ids) + pos_encodings  # (N, L, H) + (N, L, H) -> (N, L, H)
-        hidden = self.transformer.forward(src, tgt, src_mask=self.no_mask.bool(), tgt_mask=self.subsequent_mask.bool(),
+        """
+        :param: src (N, L, H)
+        :param: tgt (N, L, H)
+        :param: src_key_padding_mask (N, L)
+        :param: tgt_key_padding_mask (N, L)
+        :return hidden: (N, L, H)
+        """
+        N, _, _ = src.size()
+        pos_encodings = self.pos_encodings.unsqueeze(0).expand(N, -1, -1)  # (L, H) -> (1, L, H) ->
+        # --- encode positions ---  #
+        src = src + pos_encodings  # (N, L, H) + (N, L, H) -> (N, L, H)
+        tgt = tgt + pos_encodings  # (N, L, H) + (N, L, H) -> (N, L, H)
+        # --- attention masks --- #
+        src_mask = self.no_mask.bool()
+        tgt_mask = self.subsequent_mask.bool()
+        # --- encode & decode --- #
+        hidden = self.transformer.forward(src, tgt, src_mask=src_mask, tgt_mask=tgt_mask,
                                           src_key_padding_mask=src_key_padding_mask,
                                           tgt_key_padding_mask=tgt_key_padding_mask)
         return hidden
 
 
-class TransformerScratch(TransformerBase):
-    name: str = "transformer_scratch"
+class EncoderDecoderScratch(torch.nn.Module):
+    name: str = "scratch"
 
-    def __init__(self, hidden_size: int, ffn_size: int, vocab_size: int, max_length: int, pad_token_id: int, heads: int,
-                 depth: int, dropout: float, lr: float):
+    def __init__(self, hidden_size: int, ffn_size: int, max_length: int, heads: int,
+                 depth: int, dropout: float):
         # --- we build the encoder and the decoder from scratch --- #
-        super().__init__(hidden_size, ffn_size, vocab_size, max_length, pad_token_id, heads, depth, dropout, lr)
+        super().__init__()
         self.encoder = Encoder(hidden_size, ffn_size, max_length, heads, depth, dropout)  # the encoder stack
         self.decoder = Decoder(hidden_size, ffn_size, max_length, heads, depth, dropout)  # the decoder stack
+        # --- we register any constant tensors to the buffer instead of using to(device) --- #
+        # this is to follow the best practice of multi-gpu training with pytorch-lightning
+        # https://pytorch-lightning.readthedocs.io/en/latest/advanced/multi_gpu.html#init-tensors-using-type-as-and-register-buffer
+        self.register_buffer("pos_encodings", tensors.pos_encodings(max_length, hidden_size))  # (L, H)
 
-    def forward(self, src_ids: torch.Tensor, tgt_ids: torch.Tensor,
+    def forward(self, src: torch.Tensor, tgt: torch.Tensor,
                 src_key_padding_mask: torch.LongTensor, tgt_key_padding_mask: torch.LongTensor) -> torch.Tensor:
         """
-        :param: src_ids (N, L)
-        :param: tgt_ids (N, L)
+        :param: src (N, L, H)
+        :param: tgt (N, L, H)
         :param: src_key_padding_mask (N, L)
         :param: tgt_key_padding_mask (N, L)
         :return hidden: (N, L, H)
         """
-        N, _ = src_ids.size()  # (N, L)
-        pos_encodings = self.pos_encodings.repeat(N, 1, 1)  # (L, H) -> (N, L, H)
-        src = self.token_embeddings(src_ids) + pos_encodings  # (N, L, H) + (N, L, H) -> (N, L, H)
-        tgt = self.token_embeddings(tgt_ids) + pos_encodings  # (N, L, H) + (N, L, H) -> (N, L, H)
+        N, L, _ = src.size()  # (N, L)
+        pos_encodings = self.pos_encodings.expand(N, L, -1)  # (L, H) -> (N, L, H)
+        # --- encode positions --- #
+        src = src + pos_encodings  # (N, L, H) + (N, L, H) -> (N, L, H)
+        tgt = tgt + pos_encodings  # (N, L, H) + (N, L, H) -> (N, L, H)
+        # --- encode & decode --- #
         memory = self.encoder.forward(src, src_key_padding_mask)  # ... -> (N, L, H)
         hidden = self.decoder.forward(tgt, memory, tgt_key_padding_mask, src_key_padding_mask)  # ... (N, L, H)
         return hidden

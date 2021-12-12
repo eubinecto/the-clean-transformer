@@ -1,8 +1,7 @@
 """
 A script for building a tokenizer (fit your tokenizer to the data you have)
-1. bpe
-2. sentencepiece
-3. wordpiece
+1. Byte Pair Encoding
+2. Word Piece
 # refer to the tutorial below.
 https://huggingface.co/docs/tokenizers/python/latest/pipeline.html
 # for more details on normalizers, pre/post & tokenizers

@@ -49,9 +49,9 @@ wandb: Downloading large artifact transformer_torch:overfit_small, 262.36MB. 1 f
     ├── builders.py      # 말뭉치 -> 입력텐서, 정답텐서 변환을 도와주는 빌더 정의
     ├── tensors.py       # 트랜스포머 구현에 필요한 상수텐서 정의 (e.g. subsequent_mask, positional_encoding)
     ├── datamodules.py   # 학습에 사용할 train/val/test 데이터 정의
-    ├── models.py        #  모든 신경망 모델 정의
+    ├── models.py        # 모든 신경망 모델 정의
     ├── fetchers.py      # 데이터를 다운로드 및 로드하는 함수 정의
-    ├── paths.py         # fetchers.py가 데이터를 다운로드 할 경로 정의
+    ├── paths.py         # fetchers.py가 데이터를 다운로드 및 로드할 경로 정의
     └── __init__.py          
 ```
 

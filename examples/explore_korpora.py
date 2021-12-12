@@ -1,6 +1,5 @@
 from Korpora import Korpora
-from enkorde.paths import KORPORA_DIR
-from fetchers import fetch_kor2eng
+from cleanformer.paths import KORPORA_DIR
 
 
 def main():
@@ -8,8 +7,6 @@ def main():
     Korpora.fetch('korean_parallel_koen_news',
                   root_dir=KORPORA_DIR)
 
-    korpus = fetch_kor2eng()
-    print(korpus.get_all_texts())
 
 if __name__ == '__main__':
     main()

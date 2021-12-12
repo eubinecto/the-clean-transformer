@@ -1,6 +1,5 @@
 
-from enkorde.builders import build_lookahead_mask
-from enkorde.loaders import load_device
+from cleanformer.tensors import subsequent_mask
 import torch
 
 
@@ -8,12 +7,11 @@ def main():
     N = 30
     L = 10
     heads = 8
-    device = load_device()
-    lookahead_mask = build_lookahead_mask(L, device)
+    mask = subsequent_mask(L)
     # multi-head scores.
     S = torch.randn(size=(N, heads, L, L))
     # 아하, 간단하네.
-    S = torch.masked_fill(S, lookahead_mask == 0, value=float("-inf"))
+    S = S.masked_fill(mask == 1, float("-inf"))
     print(S)
 
 

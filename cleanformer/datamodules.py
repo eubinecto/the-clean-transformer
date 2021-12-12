@@ -7,8 +7,8 @@ from typing import Tuple, Optional, List
 from tokenizers import Tokenizer
 from torch.utils.data import Dataset, DataLoader
 from pytorch_lightning import LightningDataModule
-from enkorde.builders import TrainInputsBuilder, LabelsBuilder
-from enkorde.fetchers import fetch_kor2eng
+from cleanformer.builders import TrainInputsBuilder, LabelsBuilder
+from cleanformer.fetchers import fetch_kor2eng
 
 # to suppress warnings - we just allow parallelism
 # https://github.com/kakaobrain/pororo/issues/69#issuecomment-927564132

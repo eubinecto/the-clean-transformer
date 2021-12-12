@@ -8,8 +8,8 @@ from os import path
 from typing import Tuple, List
 from Korpora import KoreanParallelKOENNewsKorpus
 from tokenizers import Tokenizer
-from enkorde.paths import CONFIG_YAML, KORPORA_DIR, tokenizer_dir, transformer_dir
-from enkorde.models import Transformer
+from cleanformer.paths import CONFIG_YAML, KORPORA_DIR, tokenizer_dir, transformer_dir
+from cleanformer.models import Transformer
 
 
 def fetch_kor2eng() -> Tuple[List[Tuple[str, str]],
@@ -25,7 +25,7 @@ def fetch_kor2eng() -> Tuple[List[Tuple[str, str]],
 
 def fetch_tokenizer(entity: str, ver: str) -> Tokenizer:
     api = wandb.Api()
-    artifact = api.artifact(f"{entity}/enkorde/tokenizer:{ver}", type="other")
+    artifact = api.artifact(f"{entity}/cleanformer/tokenizer:{ver}", type="other")
     # use checkout instead of download to save space and simplify directory structures
     # https://docs.wandb.ai/ref/python/artifact#checkout
     artifact_path = artifact.download(root=tokenizer_dir(ver))
@@ -45,7 +45,7 @@ def fetch_tokenizer(entity: str, ver: str) -> Tokenizer:
 
 def fetch_transformer(entity: str, ver: str) -> Transformer:
     api = wandb.Api()
-    artifact_path = api.artifact(f"{entity}/enkorde/transformer:{ver}", type="model") \
+    artifact_path = api.artifact(f"{entity}/cleanformer/transformer:{ver}", type="model") \
                        .download(root=transformer_dir(ver))
     ckpt_path = path.join(artifact_path, "transformer.ckpt")
     transformer = Transformer.load_from_checkpoint(ckpt_path)

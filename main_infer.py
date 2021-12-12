@@ -1,6 +1,6 @@
 import argparse
-from enkorde.builders import InferInputsBuilder
-from enkorde.fetchers import fetch_config, fetch_tokenizer, fetch_transformer
+from cleanformer.builders import InferInputsBuilder
+from cleanformer.fetchers import fetch_config, fetch_tokenizer, fetch_transformer
 
 
 def main():

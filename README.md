@@ -1,9 +1,12 @@
-# Enkorde
+# The Clean Transformer
+
 [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/drive/181hTrhfbmyub7UaMJmBY_fbFfLBCBi58?usp=sharing)
 
-[Weights& Biases](https://wandb.ai/eubinecto/enkorde/artifacts/dataset/seoul2jeju/07c261d01dff37c66a8c)와
-[pytorch-lightning](https://www.pytorchlightning.ai)으로 밑바닥부터 구현해보는 트랜스포머 
-> [광주인공지능사관학교](https://aischool.likelion.net) X [멋쟁이사자차럼](https://www.likelion.net) 2기 자연어처리 과정 수업자료
+🇰🇷 `pytorch-lightning`과 `wandb`로 깔끔하게 구현해보는 트랜스포머 
+
+🇬🇧 Transformer implemented with clean and structured code - much thanks to `pytorch-lightning` & `wandb `!
+
+
 ## Quick Start
 우선, 리포를 클론하고 가상환경을 구축합니다:
 ```shell
@@ -34,8 +37,8 @@ wandb: Enter your choice:
 `--kor` 문장을 영어로 번역합니다:
 ```text
 wandb: You chose 'Don't visualize my results'
-wandb: Downloading large artifact transformer_torch:overfit_small, 262.36MB. 1 files... Done. 0:0:0
-그러나 이것은 또한 책 ##상 ##도 필요로 하지 않는다 . -> like all op ##ti ##ca ##l mic ##e , but it also doesn ' t need a des ##k .
+wandb: Downloading large artifact transformer:overfit_small, 263.49MB. 1 files... Done. 0:0:0
+카페 ##인은 원래 커피 ##에 들어 ##있는 물질 ##이다 . -> caf ##fe ##ine is a subst ##ance natural ##ly found in coffee .
 ```
 
 ## 프로젝트 구조 
@@ -44,8 +47,8 @@ wandb: Downloading large artifact transformer_torch:overfit_small, 262.36MB. 1 f
 ├── main_build.py        # 주어진 말뭉치에 적합한 huggingface 토크나이저를 훈련시킬 때 사용하는 스크립트
 ├── main_train.py        # 구현된 트랜스포머를 훈련시킬 때 사용하는 스크립트
 ├── main_infer.py        # 사전학습된 트랜스포머로 예측을 해볼 때 사용하는 스크립트
-├── config.yaml          # main_build.py 와 main_train.py에 필요한 인자를 정의해놓는 설정파일
-└── enkorde              # main 스크립트에 사용될 재료를 정의하는 파이썬 패키지
+├── config.yaml           # main_build.py 와 main_train.py에 필요한 인자를 정의해놓는 설정파일
+└── cleanformer          # main 스크립트에 사용될 재료를 정의하는 파이썬 패키지
     ├── builders.py      # 말뭉치 -> 입력텐서, 정답텐서 변환을 도와주는 빌더 정의
     ├── tensors.py       # 트랜스포머 구현에 필요한 상수텐서 정의 (e.g. subsequent_mask, positional_encoding)
     ├── datamodules.py   # 학습에 사용할 train/val/test 데이터 정의

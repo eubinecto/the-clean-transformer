@@ -1,6 +1,6 @@
 import torch
 
-from enkorde.tensors import subsequent_mask
+from cleanformer.tensors import subsequent_mask
 
 
 def main():

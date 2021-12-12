@@ -1,5 +1,5 @@
 
-from enkorde.tensors import pos_encodings
+from cleanformer.tensors import pos_encodings
 import numpy as np
 
 

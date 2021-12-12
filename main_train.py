@@ -5,10 +5,10 @@ import argparse
 from pytorch_lightning.callbacks import LearningRateMonitor
 from pytorch_lightning.loggers import WandbLogger
 from pytorch_lightning import Trainer
-from enkorde.models import Transformer
-from enkorde.fetchers import fetch_tokenizer, fetch_config
-from enkorde.paths import ROOT_DIR
-from enkorde.datamodules import Kor2EngDataModule, Kor2EngSmallDataModule
+from cleanformer.models import Transformer
+from cleanformer.fetchers import fetch_tokenizer, fetch_config
+from cleanformer.paths import ROOT_DIR
+from cleanformer.datamodules import Kor2EngDataModule, Kor2EngSmallDataModule
 
 
 def main():
@@ -23,7 +23,7 @@ def main():
     args = parser.parse_args()
     config = fetch_config()['train'][args.ver]
     config.update(vars(args))
-    with wandb.init(entity=config['entity'], project="enkorde", config=config) as run:
+    with wandb.init(entity=config['entity'], project="cleanformer", config=config) as run:
         # --- fetch a pre-trained tokenizer from wandb -- #
         tokenizer = fetch_tokenizer(config['entity'], config['tokenizer'])
         # --- instantiate the transformer to train --- #

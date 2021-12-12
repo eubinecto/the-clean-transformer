@@ -1,5 +1,5 @@
-from enkorde.datamodules import Kor2EngSmallDataModule
-from enkorde.fetchers import fetch_tokenizer, fetch_config
+from cleanformer.datamodules import Kor2EngSmallDataModule
+from cleanformer.fetchers import fetch_config
 
 
 def main():

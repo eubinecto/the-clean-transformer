@@ -17,8 +17,8 @@ from tokenizers.models import BPE, WordPiece
 from tokenizers.normalizers import Lowercase
 from tokenizers.pre_tokenizers import Whitespace, Digits, Punctuation
 from tokenizers.trainers import BpeTrainer, WordPieceTrainer
-from enkorde.paths import ROOT_DIR
-from enkorde.fetchers import fetch_config, fetch_kor2eng
+from cleanformer.paths import ROOT_DIR
+from cleanformer.fetchers import fetch_config, fetch_kor2eng
 
 
 def main():
@@ -45,7 +45,7 @@ def main():
     tokenizer.pre_tokenizer = pre_tokenizers.Sequence([Whitespace(), Digits(), Punctuation()])  # noqa
     tokenizer.normalizer = normalizers.Sequence([Lowercase()])  # noqa
     # --- prepare the data --- #
-    with wandb.init(entity=config['entity'], project="dekorde", config=config) as run:
+    with wandb.init(entity=config['entity'], project="cleanformer", config=config) as run:
         kor2eng_train, kor2eng_val, kor2eng_test = fetch_kor2eng()
         # chaining two generators;  https://stackoverflow.com/a/3211047
         iterator = chain((kor for kor, _ in kor2eng_train),

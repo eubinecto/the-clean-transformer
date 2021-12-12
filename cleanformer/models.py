@@ -5,7 +5,7 @@ from pytorch_lightning import LightningModule
 from torchmetrics import Accuracy
 from torch.nn import functional as F
 from tqdm import tqdm
-from enkorde import tensors
+from cleanformer import tensors
 
 
 class Transformer(LightningModule):

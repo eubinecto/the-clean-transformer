@@ -14,7 +14,7 @@ git clone https://github.com/eubinecto/the-clean-transformer.git
 conda create -n cleanformer python=3.9 
 conda activate cleanformer
 conda install pip
-cd cleanformer
+cd the-clean-transformer
 pip install -r requirements.txt
 ```
 

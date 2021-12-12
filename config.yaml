@@ -1,7 +1,6 @@
 # --- config for training a model --- #
 train:
-  overfit_torch:
-    implementation: torch
+  overfit:
     hidden_size: 512
     ffn_size: 512
     heads: 32
@@ -16,8 +15,7 @@ train:
     shuffle: true
     data: kor2eng
   # just to test things out
-  overfit_small_torch:
-    implementation: torch
+  overfit_small:
     hidden_size: 512
     ffn_size: 512
     heads: 32
@@ -32,39 +30,6 @@ train:
     # shuffle the training set
     shuffle: true
     data: kor2eng_small
-  overfit_scratch:
-    implementation: scratch
-    hidden_size: 512
-    ffn_size: 512
-    heads: 32
-    depth: 3
-    max_epochs: 10
-    max_length: 145
-    batch_size: 64
-    lr: 0.0001
-    tokenizer: wp
-    dropout: 0.0
-    seed: 410
-    shuffle: true
-    data: kor2eng
-  # just to test things out
-  overfit_small_scratch:
-    implementation: scratch
-    hidden_size: 512
-    ffn_size: 512
-    heads: 32
-    depth: 3
-    max_epochs: 400
-    max_length: 145
-    batch_size: 64
-    lr: 0.0001
-    tokenizer: wp
-    dropout: 0.0
-    seed: 410
-    # shuffle the training set
-    shuffle: true
-    data: kor2eng_small
-
 
 # --- config for building a tokenizer --- #
 build:

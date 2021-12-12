@@ -27,8 +27,7 @@ def main():
         # --- fetch a pre-trained tokenizer from wandb -- #
         tokenizer = fetch_tokenizer(config['entity'], config['tokenizer'])
         # --- instantiate the transformer to train --- #
-        transformer = Transformer(config['implementation'],
-                                  config['hidden_size'],
+        transformer = Transformer(config['hidden_size'],
                                   config['ffn_size'],
                                   tokenizer.get_vocab_size(),  # vocab_size
                                   config['max_length'],

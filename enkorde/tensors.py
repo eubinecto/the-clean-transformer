@@ -5,14 +5,6 @@ they will be registered as buffers.
 import torch
 
 
-def no_mask(max_length: int) -> torch.LongTensor:
-    """
-    Just allow all positions
-    """
-    mask = torch.zeros(size=(max_length, max_length)).long()
-    return mask
-
-
 def subsequent_mask(max_length: int) -> torch.LongTensor:
     """
     Subsequently allow positions
@@ -27,9 +19,8 @@ def pos_encodings(max_length: int, hidden_size: int) -> torch.Tensor:
     """
     positions = torch.arange(max_length).view(-1, 1)  # (,) -> (L)
     freqs = 0.0001**(torch.arange(hidden_size)[::2] / hidden_size).view(1, -1)  # (,) -> (H)
-    # broadcast multiplication (broadcast positions to each frequency)
     encodings = torch.zeros(size=(max_length, hidden_size))  # (L, H)
-    # fill in the pairs
+    # fill in the pairs by broadcast-multiplying freqs to positions
     encodings[:, ::2] = torch.sin(freqs * positions)   # evens = sin
     # odds = cos, but with the same frequency as above
     # why the same frequency?

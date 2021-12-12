@@ -202,8 +202,8 @@ class EncoderDecoderTorch(torch.nn.Module):
         :param: tgt_key_padding_mask (N, L)
         :return hidden: (N, L, H)
         """
-        N, _, _ = src.size()
-        pos_encodings = self.pos_encodings.unsqueeze(0).expand(N, -1, -1)  # (L, H) -> (1, L, H) ->
+        N, L, _ = src.size()
+        pos_encodings = self.pos_encodings.unsqueeze(0).expand(N, L, -1)  # (L, H) -> (1, L, H) -> (N, L, H)
         # --- encode positions ---  #
         src = src + pos_encodings  # (N, L, H) + (N, L, H) -> (N, L, H)
         tgt = tgt + pos_encodings  # (N, L, H) + (N, L, H) -> (N, L, H)
@@ -241,7 +241,7 @@ class EncoderDecoderScratch(torch.nn.Module):
         :return hidden: (N, L, H)
         """
         N, L, _ = src.size()  # (N, L)
-        pos_encodings = self.pos_encodings.expand(N, L, -1)  # (L, H) -> (N, L, H)
+        pos_encodings = self.pos_encodings.unsqueeze(0).expand(N, L, -1)  # (L, H) -> (1, L, H) -> (N, L, H)
         # --- encode positions --- #
         src = src + pos_encodings  # (N, L, H) + (N, L, H) -> (N, L, H)
         tgt = tgt + pos_encodings  # (N, L, H) + (N, L, H) -> (N, L, H)

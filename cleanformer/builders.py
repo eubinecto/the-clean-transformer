@@ -30,7 +30,10 @@ class InputsBuilder(DataBuilder, ABC):
     def src_inputs(self, srcs: List[str]) -> torch.LongTensor:
         # the source sentences, which are to be fed as the inputs to the encoder
         src_ids, src_key_padding_mask = self.encode([
-            self.tokenizer.bos_token + " " + sent + " " + self.tokenizer.eos_token  # noqa
+            # source sentence does not need a bos token, because, unlike decoder,
+            # what encoder does is simply extracting  contexts from src_ids
+            # https://github.com/Kyubyong/transformer/issues/64
+            sent + " " + self.tokenizer.eos_token  # noqa
             for sent in srcs
         ])
         src_inputs = torch.stack([src_ids, src_key_padding_mask], dim=1)  # (N, 2, L)

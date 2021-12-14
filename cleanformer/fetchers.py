@@ -4,7 +4,6 @@ Korpora 에서도 fetch 라고 표현한다: https://github.com/ko-nlp/Korpora
 """
 import wandb
 import yaml
-from os import path
 from typing import Tuple, List
 from Korpora import KoreanParallelKOENNewsKorpus
 from tokenizers import Tokenizer
@@ -24,13 +23,11 @@ def fetch_kor2eng() -> Tuple[List[Tuple[str, str]],
 
 
 def fetch_tokenizer(entity: str, ver: str) -> Tokenizer:
-    api = wandb.Api()
-    artifact = api.artifact(f"{entity}/cleanformer/tokenizer:{ver}", type="other")
-    # use checkout instead of download to save space and simplify directory structures
-    # https://docs.wandb.ai/ref/python/artifact#checkout
-    artifact_path = artifact.download(root=tokenizer_dir(ver))
-    json_path = path.join(artifact_path, "tokenizer.json")
-    tokenizer = Tokenizer.from_file(json_path)
+    artifact = wandb.Api().artifact(f"{entity}/cleanformer/tokenizer:{ver}", type="other")
+    artifact_path = tokenizer_dir(ver)
+    artifact.download(root=artifact_path)
+    json_path = artifact_path / "tokenizer.json"
+    tokenizer = Tokenizer.from_file(str(json_path))
     # just manually register the special tokens
     tokenizer.pad_token = artifact.metadata['pad']
     tokenizer.pad_token_id = artifact.metadata['pad_id']
@@ -44,11 +41,11 @@ def fetch_tokenizer(entity: str, ver: str) -> Tokenizer:
 
 
 def fetch_transformer(entity: str, ver: str) -> Transformer:
-    api = wandb.Api()
-    artifact_path = api.artifact(f"{entity}/cleanformer/transformer:{ver}", type="model") \
-                       .download(root=transformer_dir(ver))
-    ckpt_path = path.join(artifact_path, "transformer.ckpt")
-    transformer = Transformer.load_from_checkpoint(ckpt_path)
+    artifact_path = transformer_dir(ver)
+    wandb.Api().artifact(f"{entity}/cleanformer/transformer:{ver}", type="model") \
+               .download(root=artifact_path)
+    ckpt_path = artifact_path / "transformer.ckpt"
+    transformer = Transformer.load_from_checkpoint(str(ckpt_path))
     return transformer
 
 

@@ -14,7 +14,7 @@ from cleanformer.datamodules import Kor2EngDataModule, Kor2EngSmallDataModule
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("entity", type=str)
-    parser.add_argument("--ver", type=str, default="overfit_small_scratch")
+    parser.add_argument("--ver", type=str, default="overfit_small")
     parser.add_argument("--num_workers", type=int, default=os.cpu_count())
     parser.add_argument("--log_every_n_steps", type=int, default=1)
     parser.add_argument("--fast_dev_run", action="store_true", default=False)

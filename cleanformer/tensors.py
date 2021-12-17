@@ -9,7 +9,7 @@ def subsequent_mask(max_length: int) -> torch.LongTensor:
     """
     Subsequently allow positions
     """
-    mask = torch.triu(torch.ones(size=(max_length, max_length)), diagonal=1).long()  # (L, L) -> (L, L)
+    mask = torch.tril(torch.ones(size=(max_length, max_length)), diagonal=0).long()  # (L, L) -> (L, L)
     return mask
 
 

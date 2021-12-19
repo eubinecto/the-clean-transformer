@@ -36,7 +36,7 @@ def main():
                                   config['depth'],
                                   config['dropout'],
                                   config['lr'])
-        # --- choose the data --- #
+        # --- choose the data (either the full version, or a smaller version) --- #
         if config['data'] == Kor2EngDataModule.name:
             datamodule = Kor2EngDataModule(config, tokenizer)
         elif config['data'] == Kor2EngSmallDataModule.name:
@@ -57,14 +57,14 @@ def main():
                           logger=logger)
         # --- start training --- #
         trainer.fit(model=transformer, datamodule=datamodule)
-        # save them only if the training is properly done
+        # --- upload the model to wandb only if the training is properly done --- #
         if not config['fast_dev_run'] and trainer.current_epoch == config['max_epochs'] - 1:
-            ckpt_path = os.path.join(ROOT_DIR, "transformer.ckpt")
-            trainer.save_checkpoint(ckpt_path)
+            ckpt_path = ROOT_DIR, "transformer.ckpt"
+            trainer.save_checkpoint(str(ckpt_path))
             artifact = wandb.Artifact(name="transformer", type="model", metadata=config)
-            artifact.add_file(ckpt_path)
+            artifact.add_file(str(ckpt_path))
             run.log_artifact(artifact, aliases=["latest", config['ver']])
-            os.remove(ckpt_path)  # make sure you remove it after you are done with uploading it
+            os.remove(str(ckpt_path))  # make sure you remove it after you are done with uploading it
 
 
 if __name__ == '__main__':

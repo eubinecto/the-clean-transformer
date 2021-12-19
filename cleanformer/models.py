@@ -240,7 +240,7 @@ class DecoderLayer(torch.nn.Module):
         x = self.masked_mhsa_layer.forward(q=x, k=x, v=x, key_padding_mask=x_key_padding_mask) + x  # residual
         # soft-align memory with respect to x
         x = self.mheda_layer.forward(q=x, k=memory, v=memory, key_padding_mask=memory_key_padding_mask) + x  # residual
-        # apply linear transformation to each positional identically but independently
+        # apply linear transformation to each position independently but identically
         x = self.ffn(x) + x  # residual
         return x
 
@@ -285,8 +285,7 @@ class MultiHeadAttentionLayer(torch.nn.Module):
         a query-key similarity matrix, False if you want to apply only the padding mask to the matrix
         """
         super().__init__()
-        # hidden size must be divisible by heads.
-        assert hidden_size % heads == 0
+        assert hidden_size % heads == 0, "hidden size is not divisible by heads"
         self.max_length = max_length
         self.hidden_size = hidden_size
         self.heads = heads
@@ -336,13 +335,14 @@ class MultiHeadAttentionLayer(torch.nn.Module):
         """
         N, _, _ = q.size()
         # --- split Q, K, V into multi-heads --- #
-        q = q.reshape(N, self.max_length, self.heads, self.head_size)  # (N, L, H) -> (N, L, heads, head_size)
-        k = k.reshape(N, self.max_length, self.heads, self.head_size)  # (N, L, H) -> (N, L, heads, head_size)
-        v = v.reshape(N, self.max_length, self.heads, self.head_size)  # (N, L, H) -> (N, L, heads, head_size)
+        q = q.view(N, self.max_length, self.heads, self.head_size)  # (N, L, H) -> (N, L, heads, head_size)
+        k = k.view(N, self.max_length, self.heads, self.head_size)  # (N, L, H) -> (N, L, heads, head_size)
+        v = v.view(N, self.max_length, self.heads, self.head_size)  # (N, L, H) -> (N, L, heads, head_size)
         # --- Q * K^T, query-key similarities --- #
         # (N, L, heads, head_size), (N, L, heads, head_size) -> (N, heads, L, L)
         sims = torch.einsum("nqhs,nkhs->nhqk", q, k)
         # --- Q * K^T / sqrt(d_k), down-scaling similarities to prevent gradient vanishing --- #
+        # (N, heads, L, L) -> down-scale -> (N, heads, L, L)
         sims /= np.sqrt(self.head_size)
         # --- ignore the padded tokens. Ignore the subsequent positions optionally  --- #
         sims = sims.masked_fill(self.build_mask(key_padding_mask) == 0, float("-inf"))
@@ -352,7 +352,8 @@ class MultiHeadAttentionLayer(torch.nn.Module):
         # (N, heads, L, L) -> (N, L, heads, head_size)
         contexts = torch.einsum("nhqk,nkhs->nqhs", attentions, v)
         # --- concat(head_1, head_2, ... head_heads) --- #
-        concats = contexts.reshape(N, self.max_length, self.hidden_size)  # (N, L, heads, head_size) -> (N, L, H)
+        # (N, L, heads, head_size) -> (N, L, H)
+        concats = contexts.contiguous().view(N, self.max_length, self.hidden_size)
         # ---  concat(head_1, head_2, ... head_heads) * W_o --- #
         contexts = self.linear_o(concats)  # (N, L, H) * (H, H) -> (N, L, H)
         return contexts
@@ -365,11 +366,11 @@ class MultiHeadAttentionLayer(torch.nn.Module):
         """
         N, _ = key_padding_mask.size()
         # (N, L) -> (N, 1, 1, L) -> (N, heads, L, L)
-        mask = key_padding_mask.reshape(N, 1, 1, self.max_length)\
+        mask = key_padding_mask.view(N, 1, 1, self.max_length)\
                                .expand(-1, self.heads, self.max_length, -1)
         if self.masked:
             # (L, L) -> (1, 1, L, L) -> (N, heads, L, L)
-            subsequent_mask = self.subsequent_mask.reshape(1, 1, self.max_length, self.max_length)\
+            subsequent_mask = self.subsequent_mask.view(1, 1, self.max_length, self.max_length)\
                                                   .expand(N, self.heads, -1, -1)
             # (N, heads, L, L), (N, heads, L, L) -> (N, heads, L, L)
             mask = torch.logical_and(mask, subsequent_mask).long()

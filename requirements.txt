@@ -67,15 +67,15 @@ termcolor==1.1.0
 tokenizers==0.10.3
 torch==1.9.0
 torchmetrics==0.6.1
+torchtext==0.10.0
 tqdm==4.62.3
 transformers==4.11.3
 tweepy==4.4.0
 typing-extensions==3.10.0.2
 urllib3==1.26.7
-wandb==0.12.7
+wandb==0.12.9
 Werkzeug==2.0.2
 xlrd==2.0.1
 yarl==1.7.2
 yaspin==2.1.0
 zipp==3.6.0
-torchtext==0.10.0

@@ -59,7 +59,7 @@ def main():
         trainer.fit(model=transformer, datamodule=datamodule)
         # --- upload the model to wandb only if the training is properly done --- #
         if not config['fast_dev_run'] and trainer.current_epoch == config['max_epochs'] - 1:
-            ckpt_path = ROOT_DIR, "transformer.ckpt"
+            ckpt_path = ROOT_DIR / "transformer.ckpt"
             trainer.save_checkpoint(str(ckpt_path))
             artifact = wandb.Artifact(name="transformer", type="model", metadata=config)
             artifact.add_file(str(ckpt_path))

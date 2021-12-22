@@ -58,7 +58,7 @@ wandb: Downloading large artifact transformer:overfit_small, 263.49MB. 1 files..
     └── __init__.py          
 ```
 
-## 학습모델 
+## 사전학습된 모델
 
 `overfit_small`
 --- | 

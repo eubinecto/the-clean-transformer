@@ -1,11 +1,11 @@
 import torch
 import numpy as np
-from typing import Tuple, List
-from pytorch_lightning import LightningModule
-from torchmetrics import Accuracy
-from torch.nn import functional as F
 from tqdm import tqdm
+from typing import Tuple, List
+from torch.nn import functional as F
 from cleanformer import tensors
+from torchmetrics import Accuracy
+from pytorch_lightning import LightningModule
 
 
 class Transformer(LightningModule):
@@ -309,58 +309,41 @@ class MultiHeadAttentionLayer(torch.nn.Module):
         :param key_padding_mask (N, L)
         :return: alignments (N, L, H)
         """
+        N = q.shape[0]
+        # --- linear transformation of q, k and v --- #
         q = self.linear_q(q)  # (N, L, H) * (H, H) -> (N, L, H)
         k = self.linear_k(k)  # (N, L, H) * (H, H) -> (N, L, H)
         v = self.linear_v(v)  # (N, L, H) * (H, H) -> (N, L, H)
-        alignments = self.multihead_scaled_dot_product_attention(q, k, v, key_padding_mask)  # ... -> (N, L, H)
-        return self.norm(alignments)  # layer normalisation
-
-    def multihead_scaled_dot_product_attention(self,
-                                               q: torch.Tensor,
-                                               k: torch.Tensor,
-                                               v: torch.Tensor,
-                                               key_padding_mask: torch.LongTensor) -> torch.Tensor:
-        """
-         # --- einsum symbols --- #
-         n = N
-         h = heads
-         q, k = the length of queries and keys
-         s = head_size
-        :param q: (N, L, H)
-        :param k: (N, L, H)
-        :param v: (N, L, H)
-        :param key_padding_mask (N, L)
-        :return: alignments (N, L, H)
-        """
-        N = q.shape[0]
-        # --- split Q, K, V into multi-heads --- #
+        # --- split q, k, v into multi-heads --- #
         q = q.view(N, self.max_length, self.heads, self.head_size)  # (N, L, H) -> (N, L, heads, head_size)
         k = k.view(N, self.max_length, self.heads, self.head_size)  # (N, L, H) -> (N, L, heads, head_size)
         v = v.view(N, self.max_length, self.heads, self.head_size)  # (N, L, H) -> (N, L, heads, head_size)
-        # --- Q * K^T, query-key similarities --- #
+        # --- Q * K^T; query-key similarities --- #
         # (N, L, heads, head_size), (N, L, heads, head_size) -> (N, heads, L, L)
         similarities = torch.einsum("nqhs,nkhs->nhqk", q, k)
-        # --- Q * K^T / sqrt(d_k), down-scaling similarities to prevent gradient vanishing --- #
+        # --- Q * K^T / sqrt(d_k); down-scaling similarities to prevent gradient vanishing --- #
         # (N, heads, L, L) -> down-scale -> (N, heads, L, L)
         similarities /= np.sqrt(self.head_size)
-        # --- padding masks are applied to the kets in any kind of attention layer  --- #
-        mask = key_padding_mask.view(N, 1, 1, self.max_length)\
-                               .expand(-1, self.heads, self.max_length, -1)
+        # --- padding mask is applied to any kind of attention layer --- #
+        key_mask = key_padding_mask.view(N, 1, 1, self.max_length)\
+                                   .expand(-1, self.heads, self.max_length, -1)
+        # --- if this is a masked attention layer, we apply auto-regressive masking to the key mask
+        # along with padding mask --- #
         if self.masked:
             # (L, L) -> (1, 1, L, L) -> (N, heads, L, L)
-            subsequent_mask = self.subsequent_mask.view(1, 1, self.max_length, self.max_length)\
-                                                  .expand(N, self.heads, -1, -1)
-            # --- if this layer is auto-regressively masked, subsequent masks are applied as well as padding mask --- #
+            key_subsequent_mask = self.subsequent_mask.view(1, 1, self.max_length, self.max_length)\
+                                                      .expand(N, self.heads, -1, -1)
             # (N, heads, L, L), (N, heads, L, L) -> (N, heads, L, L)
-            mask = torch.logical_and(mask, subsequent_mask).long()
-        similarities = similarities.masked_fill(mask == 0, float("-inf"))
-        # --- softmax(Q * K^T / sqrt(d_k)), normalise the similarities of keys  --- #
+            key_mask = torch.logical_and(key_mask, key_subsequent_mask).long()
+        similarities = similarities.masked_fill(key_mask == 0, float("-inf"))
+        # --- softmax(Q * K^T / sqrt(d_k)); normalise the similarities of keys --- #
         attentions = torch.softmax(similarities, dim=-1)  # (N, heads, L, L) ->  (N, heads, L, L(normalised))
-        # --- softmax(Q * K^T / sqrt(d_k)) * v, soft-align keys with respect to each query --- #
+        # --- softmax(Q * K^T / sqrt(d_k)) * v; soft-align keys with respect to each query --- #
         # (N, heads, L, L) -> (N, L, heads, head_size)
         alignments = torch.einsum("nhqk,nkhs->nqhs", attentions, v)
-        # --- concat(head_1, head_2, ... head_heads) --- #
+        # --- concat(head_1, head_2, ... head_heads); concatenate multiple alignments --- #
         # (N, L, heads, head_size) -> (N, L, H)
         concats = alignments.contiguous().view(N, self.max_length, self.hidden_size)
-        # ---  concat(head_1, head_2, ... head_heads) * W_o --- #
-        return self.linear_o(concats)  # (N, L, H) * (H, H) -> (N, L, H)
+        # ---  concat(head_1, head_2, ... head_heads) * W_o; aggregate alignments --- #
+        alignments = self.linear_o(concats)  # (N, L, H) * (H, H) -> (N, L, H)
+        return self.norm(alignments)  # layer normalisation

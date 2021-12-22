@@ -7,6 +7,7 @@
 🇬🇧 Transformer implemented with clean and structured code - much thanks to `pytorch-lightning` & `wandb `!
 
 
+
 ## Quick Start
 우선, 리포를 클론하고 가상환경을 구축합니다:
 ```shell
@@ -57,11 +58,3 @@ wandb: Downloading large artifact transformer:overfit_small, 263.49MB. 1 files..
     ├── paths.py         # fetchers.py가 데이터를 다운로드 및 로드할 경로 정의
     └── __init__.py          
 ```
-
-## 트랜스포머란?
-- [WEEK7: Transformer - why?](https://www.notion.so/WEEK7-Transformer-why-8e3712fb674a4ba2a85bf6da9cd36af0)
-- [WEEK8: Transformer: How does Self-attention work?](https://www.notion.so/WEEK8-Transformer-How-does-Self-attention-work-e02fc6b942f64b2ba82ce7e35afc817d)
-- [WEEK9: How does Multihead Self attention work?](https://www.notion.so/WEEK9-How-does-Multihead-Self-attention-work-cddce1ae09eb4b0fb067a2474cbf8515)
-- [WEEK9: How does Residual Connection & Layer normalisation work?](https://www.notion.so/WEEK9-How-does-Residual-Connection-Layer-normalisation-work-b4a41db45a014378bc1c4a0f6da3757e)
-- [WEEK9: How does Positional Encoding  work?](https://www.notion.so/WEEK9-How-does-Positional-Encoding-work-0d0e5b9d17464af08f39b4977c073beb)
-

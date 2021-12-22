@@ -12,11 +12,10 @@
 우선, 리포를 클론하고 가상환경을 구축합니다:
 ```shell
 git clone https://github.com/eubinecto/the-clean-transformer.git
-conda create -n cleanformer python=3.9 
-conda activate cleanformer
-conda install pip
+python3.9 -m venv venv
+source venv/bin/activate
 cd the-clean-transformer
-pip install -r requirements.txt
+pip3 install -r requirements.txt
 ```
 
 이후 사전학습된 모델을 다운로드하고, 간단한 한국어 번역을 시도해보기 위해 `main_infer.py` 스크립트를 실행합니다. 

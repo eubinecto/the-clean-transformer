@@ -21,7 +21,7 @@ class DataBuilder:
         # don't add special tokens, we will add them ourselves
         encodings: List[Encoding] = self.tokenizer.encode_batch(sents, add_special_tokens=False)
         ids = torch.LongTensor([encoding.ids for encoding in encodings])
-        key_padding_mask = (torch.LongTensor([encoding.attention_mask for encoding in encodings]) == 0).long()
+        key_padding_mask = torch.LongTensor([encoding.attention_mask for encoding in encodings])
         return ids, key_padding_mask
 
 

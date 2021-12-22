@@ -58,12 +58,12 @@ def main():
         tokenizer.train_from_iterator(iterator, trainer=trainer)
         # --- then save it --- #
         # save to local, and then to wandb
-        json_path = os.path.join(ROOT_DIR, "tokenizer.json")
-        tokenizer.save(json_path, pretty=True)  # noqa
+        json_path = ROOT_DIR, "tokenizer.json"
+        tokenizer.save(str(json_path), pretty=True)  # noqa
         artifact = wandb.Artifact(name="tokenizer", type="other", metadata=config)
-        artifact.add_file(json_path)
+        artifact.add_file(str(json_path))
         run.log_artifact(artifact, aliases=["latest", config['ver']])
-        os.remove(json_path)  # make sure you delete it after you are done with uploading it
+        os.remove(str(json_path))  # make sure you delete it after you are done with uploading it
 
 
 if __name__ == '__main__':

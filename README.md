@@ -33,7 +33,7 @@ wandb: (3) Don't visualize my results
 wandb: Enter your choice: 
 ```
 
-3을 입력 후 엔터를 눌러주세요. 이후 사전학습된 트랜스포머 모델이 `enkorde/artifacts/transformer:overfit_small` 에 다운로드되며, 다음과 같이 주어진
+3을 입력 후 엔터를 눌러주세요. 이후 사전학습된 트랜스포머 모델이 `./artifacts/transformer:overfit_small` 에 다운로드되며, 다음과 같이 주어진
 `--kor` 문장을 영어로 번역합니다:
 ```text
 wandb: You chose 'Don't visualize my results'

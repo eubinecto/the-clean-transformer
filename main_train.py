@@ -23,26 +23,27 @@ def main():
     args = parser.parse_args()
     config = fetch_config()['train'][args.ver]
     config.update(vars(args))
+    # --- fetch a pre-trained tokenizer from wandb -- #
+    tokenizer = fetch_tokenizer(config['entity'], config['tokenizer'])
+    # --- instantiate the transformer to train --- #
+    transformer = Transformer(config['hidden_size'],
+                              config['ffn_size'],
+                              tokenizer.get_vocab_size(),  # vocab_size
+                              config['max_length'],
+                              tokenizer.pad_token_id,  # noqa
+                              config['heads'],
+                              config['depth'],
+                              config['dropout'],
+                              config['lr'])
+    # --- choose the data (either the full version, or a smaller version) --- #
+    if config['data'] == Kor2EngDataModule.name:
+        datamodule = Kor2EngDataModule(config, tokenizer)
+    elif config['data'] == Kor2EngSmallDataModule.name:
+        datamodule = Kor2EngSmallDataModule(config, tokenizer)
+    else:
+        raise ValueError(f"Invalid data: {config['data']}")
+    # --- start wandb context --- #
     with wandb.init(entity=config['entity'], project="cleanformer", config=config) as run:
-        # --- fetch a pre-trained tokenizer from wandb -- #
-        tokenizer = fetch_tokenizer(config['entity'], config['tokenizer'])
-        # --- instantiate the transformer to train --- #
-        transformer = Transformer(config['hidden_size'],
-                                  config['ffn_size'],
-                                  tokenizer.get_vocab_size(),  # vocab_size
-                                  config['max_length'],
-                                  tokenizer.pad_token_id,  # noqa
-                                  config['heads'],
-                                  config['depth'],
-                                  config['dropout'],
-                                  config['lr'])
-        # --- choose the data (either the full version, or a smaller version) --- #
-        if config['data'] == Kor2EngDataModule.name:
-            datamodule = Kor2EngDataModule(config, tokenizer)
-        elif config['data'] == Kor2EngSmallDataModule.name:
-            datamodule = Kor2EngSmallDataModule(config, tokenizer)
-        else:
-            raise ValueError(f"Invalid data: {config['data']}")
         # --- prepare a logger (wandb) and a trainer to use --- #
         logger = WandbLogger(log_model=False)
         lr_monitor = LearningRateMonitor(logging_interval='epoch')

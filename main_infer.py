@@ -5,7 +5,6 @@ from cleanformer.fetchers import fetch_config, fetch_tokenizer, fetch_transforme
 
 def main():
     parser = argparse.ArgumentParser()
-    # you must provide this
     parser.add_argument("entity", type=str, help="a wandb entity to download artifacts from")
     parser.add_argument("--ver", type=str, default="overfit_small")
     parser.add_argument("--kor", type=str, default="카페인은 원래 커피에 들어있는 물질이다.")

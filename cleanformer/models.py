@@ -1,9 +1,8 @@
 import torch
-import numpy as np
 from tqdm import tqdm
 from typing import Tuple, List
 from torch.nn import functional as F
-from cleanformer import tensors
+from cleanformer import functional
 from torchmetrics import Accuracy
 from pytorch_lightning import LightningModule
 
@@ -24,7 +23,7 @@ class Transformer(LightningModule):
         self.acc_val = Accuracy(ignore_index=pad_token_id)
         self.acc_test = Accuracy(ignore_index=pad_token_id)
         # --- constant tensors --- #
-        self.register_buffer("pos_encodings", tensors.pos_encodings(max_length, hidden_size))  # (L, H)
+        self.register_buffer("pos_encodings", functional.pos_encodings(max_length, hidden_size))  # (L, H)
 
     def forward(self, src_ids: torch.Tensor, tgt_ids: torch.Tensor,
                 src_key_padding_mask: torch.LongTensor, tgt_key_padding_mask: torch.LongTensor) -> torch.Tensor:
@@ -65,19 +64,18 @@ class Transformer(LightningModule):
 
     def predict(self, X: torch.Tensor) -> torch.Tensor:
         """
-        auto-regressive inference
+        An implementation of auto-regressive inference
         :param X: (N, 2, 2, L)
         :return: (N, L)
         """
         src_ids, src_key_padding_mask = X[:, 0, 0], X[:, 0, 1]  # (N, 2, 2, L) -> (N, L), (N, L)
         tgt_ids, tgt_key_padding_mask = X[:, 1, 0], X[:, 1, 1]  # (N, 2, 2, L) -> (N, L), (N, L)
-        # --- auto-regressive inference --- #
         for t in range(self.hparams['max_length'] - 1):
             hidden = self.forward(src_ids, tgt_ids, src_key_padding_mask, tgt_key_padding_mask)  # ... -> (N, L, H)
             cls = self.token_embeddings.weight  # (|V|, H)
             logits = torch.einsum("...lh,vh->...lv", hidden, cls)  # (N, L, H) * (|V|, H) -> (N, L, |V|)
-            probs = torch.softmax(logits, dim=2)  # (N, L, |V|) -> (N, L, |V|)
-            indices = torch.argmax(probs, dim=2)  # (N, L, |V|) -> (N, L)
+            probs = torch.softmax(logits, dim=-1)  # (N, L, |V|) -> (N, L, |V|)
+            indices = torch.argmax(probs, dim=-1)  # (N, L, |V|) -> (N, L)
             tgt_ids[:, t + 1] = indices[:, t]  # replace paddings with the predictions
             tgt_key_padding_mask[:, t + 1] = 1  # next tokens should not be ignored, so mask it
         return tgt_ids
@@ -298,7 +296,7 @@ class MultiHeadAttentionLayer(torch.nn.Module):
         self.linear_o = torch.nn.Linear(hidden_size, hidden_size)
         self.norm = torch.nn.LayerNorm(hidden_size)
         # --- constant tensors --- #
-        self.register_buffer("subsequent_mask", tensors.subsequent_mask(max_length))
+        self.register_buffer("subsequent_mask", functional.subsequent_mask(max_length))
 
     def forward(self, q: torch.Tensor, k: torch.Tensor, v: torch.Tensor,
                 key_padding_mask: torch.LongTensor) -> torch.Tensor:
@@ -322,30 +320,23 @@ class MultiHeadAttentionLayer(torch.nn.Module):
         q = q.transpose(1, 2)  # (N, L, heads, head_size) -> (N, heads, L, head_size)
         k = k.transpose(1, 2)  # (N, L, heads, head_size) -> (N, heads, L, head_size)
         v = v.transpose(1, 2)  # (N, L, heads, head_size) -> (N, heads, L, head_size)
-        # Q * K^T:  compute query-key sims
-        sims = torch.einsum("...qh,...kh->...qk", q, k)  # dot-product of hidden vectors
-        # Q * K^T / sqrt(d_k): down-scale sims to prevent gradient vanishing
-        sims /= np.sqrt(self.head_size)
-        # apply padding mask to ignore "[PAD]" tokens
-        # (N, L) -> (N, 1, 1, L) -> (N, heads, L, L)
-        key_mask = key_padding_mask.view(N, 1, 1, self.max_length)\
-                                   .expand(-1, self.heads, self.max_length, -1)
-        # if masked, we apply auto-regressive masking to the key mask as well as padding mask
+        # key mask = key padding mask: ignore [PAD] tokens
+        key_mask = key_padding_mask\
+            .view(N, 1, 1, self.max_length) \
+            .expand(-1, self.heads, self.max_length, -1)  # (N, L) -> (N, 1, 1, L) -> (N, heads, L, L)
+        # if masked, key mask = key padding mask && key subsequent mask: ignore subsequent positions as well
         if self.masked:
-            # (L, L) -> (1, 1, L, L) -> (N, heads, L, L)
-            key_subsequent_mask = self.subsequent_mask.view(1, 1, self.max_length, self.max_length)\
-                                                      .expand(N, self.heads, -1, -1)
-            # (N, heads, L, L), (N, heads, L, L) -> (N, heads, L, L)
+            key_subsequent_mask = self.subsequent_mask\
+                .view(1, 1, self.max_length, self.max_length) \
+                .expand(N, self.heads, -1, -1)  # (L, L) -> (1, 1, L, L) -> (N, heads, L, L)
             key_mask = torch.logical_and(key_mask, key_subsequent_mask).long()
-        sims = sims.masked_fill(key_mask == 0, float("-inf"))
-        # softmax(Q * K^T / sqrt(d_k)): normalise the sims over keys
-        attentions = torch.softmax(sims, dim=-1)  # (N, heads, L, L) ->  (N, heads, L, L(normalised))
-        # softmax(Q * K^T / sqrt(d_k)) * v: soft-align keys with respect to each query
-        alignments = torch.einsum("...qv,...vh->...qh", attentions, v)  # weighted-average of values
+        # soft-align values with respect to the similarities of their keys to each query
+        alignments = functional.scaled_dot_product_attention(q, k, v, key_mask)
         # concat(head_1, head_2, ... head_heads): concatenate multiple alignments
         # (N, heads, L, head_size) -> (N, L, heads, head_size) -> (N, L, H)
         concats = alignments.transpose(1, 2)\
-                            .contiguous().view(N, self.max_length, self.hidden_size)
+                            .contiguous()\
+                            .view(-1, self.max_length, self.hidden_size)
         # concat(head_1, head_2, ... head_heads) * W_o: aggregate alignments
         alignments = self.linear_o(concats)  # (N, L, H) * (H, H) -> (N, L, H)
         return self.norm(alignments)  # layer normalisation

@@ -41,7 +41,17 @@ wandb: Downloading large artifact transformer:overfit_small, 263.49MB. 1 files..
 카페 ##인은 원래 커피 ##에 들어 ##있는 물질 ##이다 . -> caf ##fe ##ine is a subst ##ance natural ##ly found in coffee .
 ```
 
-## 프로젝트 구조 
+## Pretrained Models
+
+`overfit_small`
+--- | 
+데모를 위해 한국어-영어 말뭉치의 일부분만을 과학습한 모델 |
+<img width="915" alt="image" src="https://user-images.githubusercontent.com/56193069/147040774-cabb3403-a07b-44f2-b759-6cd74dd16b6e.png"> |
+[하이퍼파라미터](https://github.com/eubinecto/the-clean-transformer/blob/92d2e6e0e275af6cbb7b8d374bc2f7a3972615ac/config.yaml#L18-L32) / [학습말뭉치](https://github.com/eubinecto/the-clean-transformer/blob/92d2e6e0e275af6cbb7b8d374bc2f7a3972615ac/cleanformer/datamodules.py#L71-L82) / [Weights & Biases 학습로그](https://wandb.ai/eubinecto/cleanformer/runs/1ebht4yh/overview?workspace=user-eubinecto)|
+use this in command: `python3 main_infer.py eubinecto --ver=overfit_small`|
+
+
+## Project Structure 
 ```
 .                        # ROOT_DIR 
 ├── main_build.py        # 주어진 말뭉치에 적합한 huggingface 토크나이저를 훈련시킬 때 사용하는 스크립트
@@ -57,12 +67,3 @@ wandb: Downloading large artifact transformer:overfit_small, 263.49MB. 1 files..
     ├── paths.py         # fetchers.py가 데이터를 다운로드 및 로드할 경로 정의
     └── __init__.py          
 ```
-
-## 사전학습된 모델
-
-`overfit_small`
---- | 
-데모를 위해 한국어-영어 말뭉치의 일부분만을 과학습한 모델 |
-<img width="915" alt="image" src="https://user-images.githubusercontent.com/56193069/147040774-cabb3403-a07b-44f2-b759-6cd74dd16b6e.png"> |
-[하이퍼파라미터](https://github.com/eubinecto/the-clean-transformer/blob/92d2e6e0e275af6cbb7b8d374bc2f7a3972615ac/config.yaml#L18-L32) / [학습말뭉치](https://github.com/eubinecto/the-clean-transformer/blob/92d2e6e0e275af6cbb7b8d374bc2f7a3972615ac/cleanformer/datamodules.py#L71-L82) / [Weights & Biases 학습로그](https://wandb.ai/eubinecto/cleanformer/runs/1ebht4yh/overview?workspace=user-eubinecto)|
-use this in command: `python3 main_infer.py eubinecto --ver=overfit_small`|

@@ -45,18 +45,18 @@ def main():
     tokenizer.pre_tokenizer = pre_tokenizers.Sequence([Whitespace(), Digits(), Punctuation()])  # noqa
     tokenizer.normalizer = normalizers.Sequence([Lowercase()])  # noqa
     # --- prepare the data --- #
+    kor2eng_train, kor2eng_val, kor2eng_test = fetch_kor2eng()
+    # chaining two generators;  https://stackoverflow.com/a/3211047
+    iterator = chain((kor for kor, _ in kor2eng_train),
+                     (eng for _, eng in kor2eng_train),
+                     (kor for kor, _ in kor2eng_val),
+                     (eng for _, eng in kor2eng_val),
+                     (kor for kor, _ in kor2eng_test),
+                     (eng for _, eng in kor2eng_test))
+    # --- train the tokenizer --- #
+    tokenizer.train_from_iterator(iterator, trainer=trainer)
+    # --- then save it --- #
     with wandb.init(entity=config['entity'], project="cleanformer", config=config) as run:
-        kor2eng_train, kor2eng_val, kor2eng_test = fetch_kor2eng()
-        # chaining two generators;  https://stackoverflow.com/a/3211047
-        iterator = chain((kor for kor, _ in kor2eng_train),
-                         (eng for _, eng in kor2eng_train),
-                         (kor for kor, _ in kor2eng_val),
-                         (eng for _, eng in kor2eng_val),
-                         (kor for kor, _ in kor2eng_test),
-                         (eng for _, eng in kor2eng_test))
-        # --- train the tokenizer --- #
-        tokenizer.train_from_iterator(iterator, trainer=trainer)
-        # --- then save it --- #
         # save to local, and then to wandb
         json_path = ROOT_DIR, "tokenizer.json"
         tokenizer.save(str(json_path), pretty=True)  # noqa

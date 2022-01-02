@@ -28,7 +28,7 @@ class CleanformerDataset(Dataset):
         return N
 
 
-class Kor2EngDataModule(LightningDataModule):
+class Kor2EngDataModule(LightningDataModule):  # lgtm [py/missing-call-to-init]
     name: str = "kor2eng"
 
     def __init__(self, config: dict, tokenizer: Tokenizer):

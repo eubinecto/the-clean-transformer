@@ -7,6 +7,15 @@
 🇬🇧 Transformer implemented with clean and structured code - much thanks to `pytorch-lightning` & `wandb `!
 
 
+## Shortcuts
+[`Transformer`](https://github.com/eubinecto/the-clean-transformer/blob/d5eafb8f89506df04c951b32b6a9f85441575ad0/cleanformer/models.py#L10-L152) /
+[`FeedForward`](https://github.com/eubinecto/the-clean-transformer/blob/d5eafb8f89506df04c951b32b6a9f85441575ad0/cleanformer/models.py#L155-L174) / 
+[`EncoderLayer` & `Encoder`](https://github.com/eubinecto/the-clean-transformer/blob/d5eafb8f89506df04c951b32b6a9f85441575ad0/cleanformer/models.py#L177-L214) /
+[`DecoderLayer` & `Decoder`](https://github.com/eubinecto/the-clean-transformer/blob/d5eafb8f89506df04c951b32b6a9f85441575ad0/cleanformer/models.py#L217-L269) / 
+[`MultiHeadAttentionLayer`](https://github.com/eubinecto/the-clean-transformer/blob/d5eafb8f89506df04c951b32b6a9f85441575ad0/cleanformer/models.py#L272-L342) /
+[`scaled_dot_product_attention`](https://github.com/eubinecto/the-clean-transformer/blob/d5eafb8f89506df04c951b32b6a9f85441575ad0/cleanformer/functional.py#L33-L53) /
+[`subsequent_mask`](https://github.com/eubinecto/the-clean-transformer/blob/d5eafb8f89506df04c951b32b6a9f85441575ad0/cleanformer/functional.py#L8-L14) / 
+ [`pos_encodings`](https://github.com/eubinecto/the-clean-transformer/blob/d5eafb8f89506df04c951b32b6a9f85441575ad0/cleanformer/functional.py#L17-L30)
 
 ## Quick Start
 우선, 리포를 클론하고 가상환경을 구축합니다:
@@ -57,10 +66,10 @@ use this in command: `python3 main_infer.py eubinecto --ver=overfit_small`|
 ├── main_build.py        # 주어진 말뭉치에 적합한 huggingface 토크나이저를 훈련시킬 때 사용하는 스크립트
 ├── main_train.py        # 구현된 트랜스포머를 훈련시킬 때 사용하는 스크립트
 ├── main_infer.py        # 사전학습된 트랜스포머로 예측을 해볼 때 사용하는 스크립트
-├── config.yaml           # main_build.py 와 main_train.py에 필요한 인자를 정의해놓는 설정파일
+├── config.yaml          # main_build.py 와 main_train.py에 필요한 인자를 정의해놓는 설정파일
 └── cleanformer          # main 스크립트에 사용될 재료를 정의하는 파이썬 패키지
     ├── builders.py      # 말뭉치 -> 입력텐서, 정답텐서 변환을 도와주는 빌더 정의
-    ├── tensors.py       # 트랜스포머 구현에 필요한 상수텐서 정의 (e.g. subsequent_mask, positional_encoding)
+    ├── functional.py    # 트랜스포머 구현에 필요한 텐서구축 함수 정의
     ├── datamodules.py   # 학습에 사용할 train/val/test 데이터 정의
     ├── models.py        # 모든 신경망 모델 정의
     ├── fetchers.py      # 데이터를 다운로드 및 로드하는 함수 정의

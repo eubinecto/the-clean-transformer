@@ -17,8 +17,8 @@ def main():
     transformer.eval()  # otherwise, the result will be different on every run
     X = InferInputsBuilder(tokenizer, config['max_length'])(srcs=[config['kor']])
     pred_ids = transformer.predict(X).squeeze().tolist()  # (1, L) -> (L) -> list
+    pred_ids = pred_ids[:pred_ids.index(tokenizer.eos_token_id)]  # noqa, stop at the first eos token.
     src_ids = X[0, 0, 0].tolist()  # (1, 2, 2, L) -> (L) -> list
-    pred_ids = pred_ids[: pred_ids.index(tokenizer.eos_token_id)]  # noqa
     print(tokenizer.decode(ids=src_ids), "->", tokenizer.decode(ids=pred_ids))
 
 

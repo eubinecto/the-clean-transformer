@@ -58,7 +58,7 @@ def main():
     # --- then save it --- #
     with wandb.init(entity=config['entity'], project="cleanformer", config=config) as run:
         # save to local, and then to wandb
-        json_path = ROOT_DIR, "tokenizer.json"
+        json_path = ROOT_DIR / "tokenizer.json"
         tokenizer.save(str(json_path), pretty=True)  # noqa
         artifact = wandb.Artifact(name="tokenizer", type="other", metadata=config)
         artifact.add_file(str(json_path))

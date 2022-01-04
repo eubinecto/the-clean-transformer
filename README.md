@@ -1,6 +1,7 @@
 # The Clean Transformer
 
 [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/drive/181hTrhfbmyub7UaMJmBY_fbFfLBCBi58?usp=sharing)
+[![Language grade: Python](https://img.shields.io/lgtm/grade/python/g/eubinecto/the-clean-transformer.svg?logo=lgtm&logoWidth=18)](https://lgtm.com/projects/g/eubinecto/the-clean-transformer/context:python)
 
 🇰🇷 `pytorch-lightning`과 `wandb`로 깔끔하게 구현해보는 트랜스포머 
 

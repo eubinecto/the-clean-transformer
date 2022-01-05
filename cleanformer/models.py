@@ -34,14 +34,12 @@ class Transformer(LightningModule):  # lgtm [py/missing-call-to-init]
         :param tgt_key_padding_mask: (N, L)
         :return hidden (N, L, H)
         """
-        N = src_ids.shape[0]
-        pos_encodings = self.pos_encodings.unsqueeze(0).expand(N, -1, -1)  # (L, H) -> (1, L, H) -> (N, L, H)
         # --- lookup embedding vectors --- #
         src = self.token_embeddings(src_ids)  # (N, L) -> (N, L, H)
         tgt = self.token_embeddings(tgt_ids)  # (N, L) -> (N, L, H)
-        # --- encode positions --- #
-        src = src + pos_encodings  # (N, L, H) + (N, L, H) -> (N, L, H)
-        tgt = tgt + pos_encodings  # (N, L, H) + (N, L, H) -> (N, L, H)
+        # --- encode positions (the positions are broadcast-added to N) --- #
+        src = src + self.pos_encodings  # (N, L, H) + (L, H) -> (N, L, H)
+        tgt = tgt + self.pos_encodings  # (N, L, H) + (L, H) -> (N, L, H)
         # --- encode & decode --- #
         memory = self.encoder.forward(src, src_key_padding_mask)  # ... -> (N, L, H)
         hidden = self.decoder.forward(tgt, memory, tgt_key_padding_mask, src_key_padding_mask)  # ... (N, L, H)

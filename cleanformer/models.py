@@ -38,8 +38,8 @@ class Transformer(LightningModule):  # lgtm [py/missing-call-to-init]
         src = self.token_embeddings(src_ids)  # (N, L) -> (N, L, H)
         tgt = self.token_embeddings(tgt_ids)  # (N, L) -> (N, L, H)
         # --- encode positions (the positions are broadcast-added to N) --- #
-        src = src + self.pos_encodings  # (N, L, H) + (L, H) -> (N, L, H)
-        tgt = tgt + self.pos_encodings  # (N, L, H) + (L, H) -> (N, L, H)
+        src += self.pos_encodings  # (N, L, H) + (L, H) -> (N, L, H)
+        tgt += self.pos_encodings  # (N, L, H) + (L, H) -> (N, L, H)
         # --- encode & decode --- #
         memory = self.encoder.forward(src, src_key_padding_mask)  # ... -> (N, L, H)
         hidden = self.decoder.forward(tgt, memory, tgt_key_padding_mask, src_key_padding_mask)  # ... (N, L, H)

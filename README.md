@@ -8,16 +8,6 @@
 🇬🇧 Transformer implemented with clean and structured code - much thanks to `pytorch-lightning` & `wandb `!
 
 
-## Shortcuts
-[`Transformer`](https://github.com/eubinecto/the-clean-transformer/blob/d5eafb8f89506df04c951b32b6a9f85441575ad0/cleanformer/models.py#L10-L152) /
-[`FeedForward`](https://github.com/eubinecto/the-clean-transformer/blob/d5eafb8f89506df04c951b32b6a9f85441575ad0/cleanformer/models.py#L155-L174) / 
-[`EncoderLayer` & `Encoder`](https://github.com/eubinecto/the-clean-transformer/blob/d5eafb8f89506df04c951b32b6a9f85441575ad0/cleanformer/models.py#L177-L214) /
-[`DecoderLayer` & `Decoder`](https://github.com/eubinecto/the-clean-transformer/blob/d5eafb8f89506df04c951b32b6a9f85441575ad0/cleanformer/models.py#L217-L269) / 
-[`MultiHeadAttentionLayer`](https://github.com/eubinecto/the-clean-transformer/blob/d5eafb8f89506df04c951b32b6a9f85441575ad0/cleanformer/models.py#L272-L342) /
-[`scaled_dot_product_attention`](https://github.com/eubinecto/the-clean-transformer/blob/d5eafb8f89506df04c951b32b6a9f85441575ad0/cleanformer/functional.py#L33-L53) /
-[`subsequent_mask`](https://github.com/eubinecto/the-clean-transformer/blob/d5eafb8f89506df04c951b32b6a9f85441575ad0/cleanformer/functional.py#L8-L14) / 
- [`pos_encodings`](https://github.com/eubinecto/the-clean-transformer/blob/d5eafb8f89506df04c951b32b6a9f85441575ad0/cleanformer/functional.py#L17-L30)
-
 ## Quick Start
 우선, 리포를 클론하고 가상환경을 구축합니다:
 ```shell

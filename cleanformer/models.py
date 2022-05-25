@@ -2,12 +2,12 @@ import torch
 from tqdm import tqdm
 from typing import Tuple, List
 from torch.nn import functional as F
-from cleanformer import functional
-from torchmetrics import Accuracy
+from cleanformer import tensors as T
+from torchmetrics import functional as mF
 from pytorch_lightning import LightningModule
 
 
-class Transformer(LightningModule):  # lgtm [py/missing-call-to-init]
+class Transformer(LightningModule):  # lgtm [py/missing-call-to-init]  # noqa
     def __init__(self, hidden_size: int, ffn_size: int,
                  vocab_size: int, max_length: int,
                  pad_token_id: int, heads: int, depth: int,
@@ -18,65 +18,55 @@ class Transformer(LightningModule):  # lgtm [py/missing-call-to-init]
         self.token_embeddings = torch.nn.Embedding(num_embeddings=vocab_size, embedding_dim=hidden_size)
         self.encoder = Encoder(hidden_size, ffn_size, max_length, heads, depth, dropout)  # the encoder stack
         self.decoder = Decoder(hidden_size, ffn_size, max_length, heads, depth, dropout)  # the decoder stack
-        # --- metrics --- #
-        self.acc_train = Accuracy(ignore_index=pad_token_id)
-        self.acc_val = Accuracy(ignore_index=pad_token_id)
-        self.acc_test = Accuracy(ignore_index=pad_token_id)
         # --- constant tensors --- #
-        self.register_buffer("pos_encodings", functional.pos_encodings(max_length, hidden_size))  # (L, H)
+        self.register_buffer("pos_encodings", T.pos_encodings(max_length, hidden_size))  # (L, H)
 
-    def forward(self, src_ids: torch.Tensor, tgt_ids: torch.Tensor,
-                src_key_padding_mask: torch.LongTensor, tgt_key_padding_mask: torch.LongTensor) -> torch.Tensor:
+    def forward(self, src_ids: torch.Tensor, tgt_r_ids: torch.Tensor,
+                src_key_padding_mask: torch.LongTensor, tgt_r_key_padding_mask: torch.LongTensor) -> torch.Tensor:
         """
         :param src_ids (N, L)
-        :param tgt_ids (N, L)
+        :param tgt_r_ids (N, L)
         :param src_key_padding_mask: (N, L)
-        :param tgt_key_padding_mask: (N, L)
+        :param tgt_r_key_padding_mask: (N, L)
         :return hidden (N, L, H)
         """
         # --- lookup embedding vectors --- #
         src = self.token_embeddings(src_ids)  # (N, L) -> (N, L, H)
-        tgt = self.token_embeddings(tgt_ids)  # (N, L) -> (N, L, H)
+        tgt_r = self.token_embeddings(tgt_r_ids)  # (N, L) -> (N, L, H)
         # --- encode positions (the positions are broadcast-added to N) --- #
         src += self.pos_encodings  # (N, L, H) + (L, H) -> (N, L, H)
-        tgt += self.pos_encodings  # (N, L, H) + (L, H) -> (N, L, H)
+        tgt_r += self.pos_encodings  # (N, L, H) + (L, H) -> (N, L, H)
         # --- encode & decode --- #
         memory = self.encoder.forward(src, src_key_padding_mask)  # ... -> (N, L, H)
-        hidden = self.decoder.forward(tgt, memory, tgt_key_padding_mask, src_key_padding_mask)  # ... (N, L, H)
+        hidden = self.decoder.forward(tgt_r, memory, tgt_r_key_padding_mask, src_key_padding_mask)  # ... (N, L, H)
         return hidden
 
-    def step(self, X: torch.Tensor, Y: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor]:
-        """
-        :param X (N, 2, 2, L)
-        :param Y (N, L)
-        :return loss (,)
-        """
-        src_ids, src_key_padding_mask = X[:, 0, 0], X[:, 0, 1]  # (N, 2, 2, L) -> (N, L), (N, L)
-        tgt_ids, tgt_key_padding_mask = X[:, 1, 0], X[:, 1, 1]  # (N, 2, 2, L) -> (N, L), (N, L)
-        hidden = self.forward(src_ids, tgt_ids, src_key_padding_mask, tgt_key_padding_mask)  # ... -> (N, L, H)
+    def step(self, src: torch.Tensor, tgt_r: torch.Tensor, tgt: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor]:
+        src_ids, src_key_padding_mask = src[:, 0], src[:, 1]  # (N, 2, L) -> (N, L), (N, L)
+        tgt_r_ids, tgt_r_key_padding_mask = tgt_r[:, 0], tgt_r[:, 1]  # (N, 2, L) -> (N, L), (N, L)
+        hidden = self.forward(src_ids, tgt_r_ids, src_key_padding_mask, tgt_r_key_padding_mask)  # ... -> (N, L, H)
         cls = self.token_embeddings.weight  # (|V|, H) -  reuse the embeddings as the classifier
         logits = torch.einsum("...lh,vh->...vl", hidden, cls)  # (N, |V|, L)
-        loss = F.cross_entropy(logits, Y, ignore_index=self.hparams['pad_token_id'])\
-                .sum()  # (N, |V|, L), (N, L) -> (N, 1) -> (1)
+        loss = F.cross_entropy(logits, tgt, ignore_index=self.hparams['pad_token_id']) \
+            .sum()  # (N, |V|, L), (N, L) -> (N, 1) -> (1)
         return loss, logits
 
-    def predict(self, X: torch.Tensor) -> torch.Tensor:
+    def predict(self, src: torch.Tensor, tgt_r: torch.Tensor) -> torch.Tensor:
         """
-        An implementation of auto-regressive inference
-        :param X: (N, 2, 2, L)
+        An implementation of autoregressive inference
         :return: (N, L)
         """
-        src_ids, src_key_padding_mask = X[:, 0, 0], X[:, 0, 1]  # (N, 2, 2, L) -> (N, L), (N, L)
-        tgt_ids, tgt_key_padding_mask = X[:, 1, 0], X[:, 1, 1]  # (N, 2, 2, L) -> (N, L), (N, L)
+        src_ids, src_key_padding_mask = src[:, 0], src[:, 1]  # (N, 2, 2, L) -> (N, L), (N, L)
+        tgt_r_ids, tgt_r_key_padding_mask = tgt_r[:, 0], tgt_r[:, 1]  # (N, 2, 2, L) -> (N, L), (N, L)
         for t in range(self.hparams['max_length'] - 1):
-            hidden = self.forward(src_ids, tgt_ids, src_key_padding_mask, tgt_key_padding_mask)  # ... -> (N, L, H)
+            hidden = self.forward(src_ids, tgt_r_ids, src_key_padding_mask, tgt_r_key_padding_mask)  # ... -> (N, L, H)
             cls = self.token_embeddings.weight  # (|V|, H)
             logits = torch.einsum("...lh,vh->...lv", hidden, cls)  # (N, L, H) * (|V|, H) -> (N, L, |V|)
             probs = torch.softmax(logits, dim=-1)  # (N, L, |V|) -> (N, L, |V|)
             indices = torch.argmax(probs, dim=-1)  # (N, L, |V|) -> (N, L)
-            tgt_ids[:, t + 1] = indices[:, t]  # replace paddings with the predictions
-            tgt_key_padding_mask[:, t + 1] = 1  # next tokens should not be ignored, so mask it
-        return tgt_ids
+            tgt_r_ids[:, t + 1] = indices[:, t]  # replace paddings with the predictions
+            tgt_r_key_padding_mask[:, t + 1] = 1  # next tokens should not be ignored, so mask it
+        return tgt_r_ids
 
     def on_train_start(self):
         # many deep transformer models are initialised with so-called "Xavier initialisation"
@@ -85,48 +75,44 @@ class Transformer(LightningModule):  # lgtm [py/missing-call-to-init]
             if param.dim() > 1:
                 torch.nn.init.xavier_uniform_(param)
 
-    def training_step(self, batch: Tuple[torch.Tensor, torch.Tensor], *args, **kwargs) -> dict:
+    def training_step(self, batch: Tuple[torch.Tensor, torch.Tensor, torch.Tensor], *args, **kwargs) -> dict:
         """
         A function for computing the loss for this batch.
         :return: a scalar tensor containing the loss for this batch
         """
-        X, Y = batch
-        loss, logits = self.step(X, Y)
+        src, tgt_r, tgt = batch
+        loss, logits = self.step(src, tgt_r, tgt)
         # why detach then?
         # A: here, we need them not for computing loss, but for computing accuracies.
         # so, it's okay to detach the tensors from computation graph, thus saving some space in GPU
         # (i.e. prevent "coda out of memory error")
         # https://discuss.pytorch.org/t/cuda-out-of-memory-during-training/85014/2
-        self.acc_train.update(logits.detach(), target=Y.detach())
         return {
-            'loss': loss
+            'loss': loss,
+            'logits': logits.detach(),
+            'tgt': tgt.detach(),
         }
 
-    def on_train_batch_end(self, outputs: dict,  *args, **kwargs):
+    def on_train_batch_end(self, outputs: dict, *args, **kwargs):
         self.log("Train/Loss", outputs['loss'])
 
     def training_epoch_end(self, outputs: List[dict]) -> None:
-        avg_loss = torch.stack([output['loss'] for output in outputs]).mean()
-        self.log("Train/Average Loss", avg_loss)
-        self.log("Train/Accuracy", self.acc_train.compute())
-        self.acc_train.reset()
+        logits = torch.cat([out['logits'] for out in outputs],
+                              dim=0)  # noqa, num_batches * (N, C) -> (num_batches * N, C)
+        tgt = torch.cat([out['tgt'] for out in outputs], dim=0)  # # num_batches * (N,) -> (num_batches * N,)
+        self.log("Train/Accuracy", mF.accuracy(logits, tgt))
 
-    def validation_step(self, batch: Tuple[torch.Tensor, torch.Tensor], *args, **kwargs) -> dict:
-        X, y = batch
-        loss, logits = self.step(X, y)
-        self.acc_val.update(logits.detach(), target=y.detach())
-        return {
-            'loss': loss
-        }
+    def validation_step(self, batch: Tuple[torch.Tensor, torch.Tensor, torch.Tensor], *args, **kwargs) -> dict:
+        return self.training_step(batch, *args, **kwargs)
 
     def on_validation_batch_end(self, outputs: dict, *args, **kwargs):
         self.log("Validation/Loss", outputs['loss'])
 
     def validation_epoch_end(self, outputs: List[dict]) -> None:
-        avg_loss = torch.stack([output['loss'] for output in outputs]).mean()
-        self.log("Validation/Average Loss", avg_loss)
-        self.log("Validation/Accuracy", self.acc_val.compute())
-        self.acc_val.reset()
+        logits = torch.cat([out['logits'] for out in outputs],
+                              dim=0)  # noqa, num_batches * (N, C) -> (num_batches * N, C)
+        tgt = torch.cat([out['tgt'] for out in outputs], dim=0)  # # num_batches * (N,) -> (num_batches * N,)
+        self.log("Validation/Accuracy", mF.accuracy(logits, tgt))
 
     def configure_optimizers(self) -> dict:
         optimizer = torch.optim.Adam(params=self.parameters(), lr=self.hparams['lr'],
@@ -135,25 +121,12 @@ class Transformer(LightningModule):  # lgtm [py/missing-call-to-init]
             'optimizer': optimizer
         }
 
-    # ---  just ignore these (boilerplate) --- #
-    def train_dataloader(self):
-        pass
-
-    def test_dataloader(self):
-        pass
-
-    def val_dataloader(self):
-        pass
-
-    def predict_dataloader(self):
-        pass
-    # ----------------------------------------- #
-
 
 class FeedForward(torch.nn.Module):
     """
     position-wise feedforward network.
     """
+
     def __init__(self, hidden_size: int, ffn_size: int, dropout: float):
         super().__init__()
         self.layers = torch.nn.Sequential(
@@ -294,7 +267,7 @@ class MultiHeadAttentionLayer(torch.nn.Module):
         self.linear_o = torch.nn.Linear(hidden_size, hidden_size)
         self.norm = torch.nn.LayerNorm(hidden_size)
         # --- constant tensors --- #
-        self.register_buffer("subsequent_mask", functional.subsequent_mask(max_length))
+        self.register_buffer("subsequent_mask", T.subsequent_mask(max_length))
 
     def forward(self, q: torch.Tensor, k: torch.Tensor, v: torch.Tensor,
                 key_padding_mask: torch.LongTensor) -> torch.Tensor:
@@ -319,22 +292,22 @@ class MultiHeadAttentionLayer(torch.nn.Module):
         k = k.transpose(1, 2)  # (N, L, heads, head_size) -> (N, heads, L, head_size)
         v = v.transpose(1, 2)  # (N, L, heads, head_size) -> (N, heads, L, head_size)
         # key mask = key padding mask: ignore [PAD] tokens
-        key_mask = key_padding_mask\
+        key_mask = key_padding_mask \
             .view(N, 1, 1, self.max_length) \
             .expand(-1, self.heads, self.max_length, -1)  # (N, L) -> (N, 1, 1, L) -> (N, heads, L, L)
         # if masked, key mask = key padding mask && key subsequent mask: ignore subsequent positions as well
         if self.masked:
-            key_subsequent_mask = self.subsequent_mask\
+            key_subsequent_mask = self.subsequent_mask \
                 .view(1, 1, self.max_length, self.max_length) \
                 .expand(N, self.heads, -1, -1)  # (L, L) -> (1, 1, L, L) -> (N, heads, L, L)
             key_mask = torch.logical_and(key_mask, key_subsequent_mask).long()
         # soft-align values with respect to the similarities of their keys to each query
-        alignments = functional.scaled_dot_product_attention(q, k, v, key_mask)
-        # concat(head_1, head_2, ... head_heads): concatenate multiple alignments
+        alignments = T.scaled_dot_product_attention(q, k, v, key_mask)
+        # cat(head_1, head_2, ... head_heads): catenate multiple alignments
         # (N, heads, L, head_size) -> (N, L, heads, head_size) -> (N, L, H)
-        concats = alignments.transpose(1, 2)\
-                            .contiguous()\
-                            .view(-1, self.max_length, self.hidden_size)
-        # concat(head_1, head_2, ... head_heads) * W_o: aggregate alignments
-        alignments = self.linear_o(concats)  # (N, L, H) * (H, H) -> (N, L, H)
+        cats = alignments.transpose(1, 2) \
+            .contiguous() \
+            .view(-1, self.max_length, self.hidden_size)
+        # cat(head_1, head_2, ... head_heads) * W_o: aggregate alignments
+        alignments = self.linear_o(cats)  # (N, L, H) * (H, H) -> (N, L, H)
         return self.norm(alignments)  # layer normalisation

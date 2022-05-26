@@ -1,16 +1,14 @@
 import argparse
 import os
-
-import torch
+import torch  # noqa
 import wandb
 from pytorch_lightning import Trainer
 from pytorch_lightning.callbacks import LearningRateMonitor
 from pytorch_lightning.loggers import WandbLogger
-from torch.utils.data import DataLoader, TensorDataset
-
-from cleanformer import tensors as T  # noqa
+from torch.utils.data import DataLoader, TensorDataset  # noqa
+from cleanformer import preprocess as P # noqa
 from cleanformer.fetchers import fetch_tokenizer, fetch_config, fetch_kor2eng
-from cleanformer.models import Transformer
+from cleanformer.models.transformer import Transformer
 from cleanformer.paths import ROOT_DIR
 
 # to suppress warnings - we just allow parallelism
@@ -20,7 +18,6 @@ os.environ["TOKENIZERS_PARALLELISM"] = "true"
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("entity", type=str)
     parser.add_argument("--ver", type=str, default="overfit_small")
     parser.add_argument("--num_workers", type=int, default=os.cpu_count())
     parser.add_argument("--log_every_n_steps", type=int, default=1)
@@ -31,15 +28,15 @@ def main():
     config = fetch_config()['train'][args.ver]
     config.update(vars(args))
     # --- fetch a pre-trained tokenizer from wandb -- #
-    tokenizer = fetch_tokenizer(config['entity'], config['tokenizer'])
+    tokenizer = fetch_tokenizer(config['tokenizer'])
     # --- prepare the dataloaders --- #
     kor2eng = fetch_kor2eng()
-    train = TensorDataset(T.src(tokenizer, config['max_length'], [src for src, _ in kor2eng[0]]),
-                          T.tgt_r(tokenizer, config['max_length'], [tgt for _, tgt in kor2eng[0]]),
-                          T.tgt(tokenizer, config['max_length'], [tgt for _, tgt in kor2eng[0]]))
-    val = TensorDataset(T.src(tokenizer, config['max_length'], [src for src, _ in kor2eng[1]]),
-                        T.tgt_r(tokenizer, config['max_length'], [tgt for _, tgt in kor2eng[1]]),
-                        T.tgt(tokenizer, config['max_length'], [tgt for _, tgt in kor2eng[1]]))
+    train = TensorDataset(P.src(tokenizer, config['max_length'], kor2eng[0]),
+                          P.tgt_r(tokenizer, config['max_length'], kor2eng[0]),
+                          P.tgt(tokenizer, config['max_length'],  kor2eng[0]))
+    val = TensorDataset(P.src(tokenizer, config['max_length'], kor2eng[1]),
+                        P.tgt_r(tokenizer, config['max_length'], kor2eng[1]),
+                        P.tgt(tokenizer, config['max_length'], kor2eng[1]))
     train_dataloader = DataLoader(train, batch_size=config['batch_size'],
                                   shuffle=config['shuffle'], num_workers=config['num_workers'])
     val_dataloader = DataLoader(val, batch_size=config['batch_size'],
@@ -55,7 +52,7 @@ def main():
                               config['dropout'],
                               config['lr'])
     # --- start wandb context --- #
-    with wandb.init(entity=config['entity'], project="cleanformer", config=config) as run:
+    with wandb.init(project="cleanformer", config=config) as run:
         # --- prepare a logger (wandb) and a trainer to use --- #
         logger = WandbLogger(log_model=False)
         lr_monitor = LearningRateMonitor(logging_interval='epoch')

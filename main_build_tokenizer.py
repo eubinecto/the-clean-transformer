@@ -23,7 +23,6 @@ from cleanformer.fetchers import fetch_config, fetch_kor2eng
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("entity", type=str)
     parser.add_argument("--ver", type=str, default="wp")
     args = parser.parse_args()
     config = fetch_config()["build"]
@@ -56,7 +55,7 @@ def main():
     # --- train the tokenizer --- #
     tokenizer.train_from_iterator(iterator, trainer=trainer)
     # --- then save it --- #
-    with wandb.init(entity=config['entity'], project="cleanformer", config=config) as run:
+    with wandb.init(project="cleanformer", config=config) as run:
         # save to local, and then to wandb
         json_path = ROOT_DIR / "tokenizer.json"
         tokenizer.save(str(json_path), pretty=True)  # noqa

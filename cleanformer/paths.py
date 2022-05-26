@@ -12,12 +12,3 @@ WANDB_DIR = ROOT_DIR / "wandb"
 KORPORA_DIR = ROOT_DIR / "korpora"
 # --- local files --- #
 CONFIG_YAML = ROOT_DIR / "config.yaml"
-
-
-# --- artifacts --- #
-def tokenizer_dir(ver: str) -> Path:
-    return ARTIFACTS_DIR / f"tokenizer-{ver}"
-
-
-def transformer_dir(ver: str) -> Path:
-    return ARTIFACTS_DIR / f"transformer-{ver}"

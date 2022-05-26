@@ -18,14 +18,13 @@ os.environ["TOKENIZERS_PARALLELISM"] = "true"
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--ver", type=str, default="overfit_small")
     parser.add_argument("--num_workers", type=int, default=os.cpu_count())
     parser.add_argument("--log_every_n_steps", type=int, default=1)
     parser.add_argument("--fast_dev_run", action="store_true", default=False)
     parser.add_argument("--overfit_batches", type=int, default=0)
     parser.add_argument("--check_val_every_n_epoch", type=int, default=5)
     args = parser.parse_args()
-    config = fetch_config()['train'][args.ver]
+    config = fetch_config()['transformer']
     config.update(vars(args))
     # --- fetch a pre-trained tokenizer from wandb -- #
     tokenizer = fetch_tokenizer(config['tokenizer'])

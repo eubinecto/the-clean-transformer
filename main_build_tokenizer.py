@@ -28,30 +28,36 @@ def main():
     config = fetch_config()["build"]
     config.update(vars(args))
     # --- prepare a tokenizer --- #
-    special_tokens = [config['pad'], config['unk'], config['bos'], config['eos']]
-    if config['ver'] == "bpe":
+    special_tokens = [config["pad"], config["unk"], config["bos"], config["eos"]]
+    if config["ver"] == "bpe":
         # tokenizer = Tokenizer(BPE(unk_token=config['unk']))
-        tokenizer = Tokenizer(BPE(unk_token=config['unk']))
-        trainer = BpeTrainer(vocab_size=config['vocab_size'],
-                             special_tokens=special_tokens)
-    elif config['ver'] == "wp":
-        tokenizer = Tokenizer(WordPiece(unk_token=config['unk']))  # noqa
-        trainer = WordPieceTrainer(vocab_size=config['vocab_size'],
-                                   special_tokens=special_tokens)
+        tokenizer = Tokenizer(BPE(unk_token=config["unk"]))
+        trainer = BpeTrainer(
+            vocab_size=config["vocab_size"], special_tokens=special_tokens
+        )
+    elif config["ver"] == "wp":
+        tokenizer = Tokenizer(WordPiece(unk_token=config["unk"]))  # noqa
+        trainer = WordPieceTrainer(
+            vocab_size=config["vocab_size"], special_tokens=special_tokens
+        )
     else:
         raise ValueError(f"Invalid ver: {config['ver']}")
     # --- pre & post processing --- #
-    tokenizer.pre_tokenizer = pre_tokenizers.Sequence([Whitespace(), Digits(), Punctuation()])  # noqa
+    tokenizer.pre_tokenizer = pre_tokenizers.Sequence(  # noqa
+        [Whitespace(), Digits(), Punctuation()]
+    )
     tokenizer.normalizer = normalizers.Sequence([Lowercase()])  # noqa
     # --- prepare the data --- #
     kor2eng_train, kor2eng_val, kor2eng_test = fetch_kor2eng()
     # chaining two generators;  https://stackoverflow.com/a/3211047
-    iterator = chain((kor for kor, _ in kor2eng_train),
-                     (eng for _, eng in kor2eng_train),
-                     (kor for kor, _ in kor2eng_val),
-                     (eng for _, eng in kor2eng_val),
-                     (kor for kor, _ in kor2eng_test),
-                     (eng for _, eng in kor2eng_test))
+    iterator = chain(
+        (kor for kor, _ in kor2eng_train),
+        (eng for _, eng in kor2eng_train),
+        (kor for kor, _ in kor2eng_val),
+        (eng for _, eng in kor2eng_val),
+        (kor for kor, _ in kor2eng_test),
+        (eng for _, eng in kor2eng_test),
+    )
     # --- train the tokenizer --- #
     tokenizer.train_from_iterator(iterator, trainer=trainer)
     # --- then save it --- #
@@ -61,9 +67,11 @@ def main():
         tokenizer.save(str(json_path), pretty=True)  # noqa
         artifact = wandb.Artifact(name="tokenizer", type="other", metadata=config)
         artifact.add_file(str(json_path))
-        run.log_artifact(artifact, aliases=["latest", config['ver']])
-        os.remove(str(json_path))  # make sure you delete it after you are done with uploading it
+        run.log_artifact(artifact, aliases=["latest", config["ver"]])
+        os.remove(
+            str(json_path)
+        )  # make sure you delete it after you are done with uploading it
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()

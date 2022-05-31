@@ -13,7 +13,7 @@ class FeedForward(torch.nn.Module):
             torch.nn.ReLU(),
             torch.nn.Linear(ffn_size, hidden_size),
             torch.nn.Dropout(dropout),
-            torch.nn.LayerNorm(hidden_size)
+            torch.nn.LayerNorm(hidden_size),
         )
 
     def forward(self, x: torch.Tensor):

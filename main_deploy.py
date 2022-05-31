@@ -1,3 +1,3 @@
 """
-deploy via streamlit
+deploy cleanformer via streamlit
 """

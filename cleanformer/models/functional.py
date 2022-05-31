@@ -11,9 +11,7 @@ def subsequent_mask(max_length: int) -> torch.LongTensor:
     a square matrix for autoregressive-ly (i.e. subsequently) allowing positions
     return: (L, L)
     """
-    mask = torch.tril(
-        torch.ones(size=(max_length, max_length)), diagonal=0
-    ).long()  # (L, L) -> (L, L)
+    mask = torch.tril(torch.ones(size=(max_length, max_length)), diagonal=0).long()  # (L, L) -> (L, L)
     return mask
 
 
@@ -22,9 +20,7 @@ def pos_encodings(max_length: int, hidden_size: int) -> torch.Tensor:
     :return: (L, H)
     """
     positions = torch.arange(max_length).view(-1, 1)  # (,) -> (L)
-    freqs = 0.0001 ** (torch.arange(hidden_size)[::2] / hidden_size).view(
-        1, -1
-    )  # (,) -> (H)
+    freqs = 0.0001 ** (torch.arange(hidden_size)[::2] / hidden_size).view(1, -1)  # (,) -> (H)
     encodings = torch.zeros(size=(max_length, hidden_size))  # (L, H)
     # fill in the pairs by broadcast-multiplying freqs to positions
     encodings[:, ::2] = torch.sin(freqs * positions)  # evens = sin

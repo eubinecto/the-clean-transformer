@@ -93,9 +93,7 @@ def main():
             artifact = wandb.Artifact(name="transformer", type="model", metadata=config)
             artifact.add_file(str(ckpt_path))
             run.log_artifact(artifact, aliases=["latest", config["ver"]])
-            os.remove(
-                str(ckpt_path)
-            )  # make sure you remove it after you are done with uploading it
+            os.remove(str(ckpt_path))  # make sure you remove it after you are done with uploading it
 
 
 if __name__ == "__main__":

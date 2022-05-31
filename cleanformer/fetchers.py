@@ -12,9 +12,7 @@ from cleanformer.paths import CONFIG_YAML, KORPORA_DIR
 from cleanformer.models.transformer import Transformer
 
 
-def fetch_kor2eng() -> Tuple[
-    List[Tuple[str, str]], List[Tuple[str, str]], List[Tuple[str, str]]
-]:
+def fetch_kor2eng() -> Tuple[List[Tuple[str, str]], List[Tuple[str, str]], List[Tuple[str, str]]]:
     # download the data
     korpus = KoreanParallelKOENNewsKorpus(root_dir=str(KORPORA_DIR))
     kor2eng_train = list(zip(korpus.train.texts, korpus.train.pairs))
@@ -41,9 +39,7 @@ def fetch_tokenizer(ver: str) -> Tokenizer:
 
 
 def fetch_transformer(ver: str) -> Transformer:
-    artifact_path = (
-        wandb.Api().artifact(f"cleanformer/transformer:{ver}", type="model").download()
-    )
+    artifact_path = wandb.Api().artifact(f"cleanformer/transformer:{ver}", type="model").download()
     ckpt_path = path.join(artifact_path, "transformer.ckpt")
     transformer = Transformer.load_from_checkpoint(str(ckpt_path))
     return transformer

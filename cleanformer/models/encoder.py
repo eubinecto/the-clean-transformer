@@ -14,25 +14,18 @@ class EncoderLayer(torch.nn.Module):
     ):
         super().__init__()
         # not masked, multi-head self-attention layer
-        self.mhsa_layer = MultiHeadAttentionLayer(
-            hidden_size, max_length, heads, masked=False
-        )
+        self.mhsa_layer = MultiHeadAttentionLayer(hidden_size, max_length, heads, masked=False)
         # position-wise feedforward network
         self.ffn = FeedForward(hidden_size, ffn_size, dropout)
 
-    def forward(
-        self, x: torch.Tensor, x_key_padding_mask: torch.LongTensor
-    ) -> torch.Tensor:
+    def forward(self, x: torch.Tensor, x_key_padding_mask: torch.LongTensor) -> torch.Tensor:
         """
         :param x (N, L, H)
         :param x_key_padding_mask (N, L)
         :return: src_hidden: (N, L, H)
         """
-        # contextualised x with itself
-        x = (
-            self.mhsa_layer.forward(q=x, k=x, v=x, key_padding_mask=x_key_padding_mask)
-            + x
-        )  # residual
+        # contextualise x with itself
+        x = self.mhsa_layer.forward(q=x, k=x, v=x, key_padding_mask=x_key_padding_mask) + x  # residual
         # apply linear transformation to each positional identically but independently
         x = self.ffn(x) + x  # residual
         return x
@@ -50,15 +43,10 @@ class Encoder(torch.nn.Module):
     ):
         super().__init__()
         self.layers = torch.nn.ModuleList(
-            [
-                EncoderLayer(hidden_size, ffn_size, max_length, heads, dropout)
-                for _ in range(depth)
-            ]
+            [EncoderLayer(hidden_size, ffn_size, max_length, heads, dropout) for _ in range(depth)]
         )
 
-    def forward(
-        self, x: torch.Tensor, x_key_padding_mask: torch.LongTensor
-    ) -> torch.Tensor:
+    def forward(self, x: torch.Tensor, x_key_padding_mask: torch.LongTensor) -> torch.Tensor:
         """
         :param x: (N, L, H)
         :param x_key_padding_mask: (N, L)

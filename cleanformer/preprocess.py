@@ -3,9 +3,7 @@ import torch  # noqa
 from tokenizers import Encoding, Tokenizer  # noqa
 
 
-def encode(
-    tokenizer: Tokenizer, max_length: int, sents: List[str]
-) -> Tuple[torch.Tensor, torch.Tensor]:
+def encode(tokenizer: Tokenizer, max_length: int, sents: List[str]) -> Tuple[torch.Tensor, torch.Tensor]:
     """
     tokenize & encoder
     """
@@ -19,15 +17,11 @@ def encode(
     # don't add special tokens, we will add them ourselves
     encodings: List[Encoding] = tokenizer.encode_batch(sents, add_special_tokens=False)
     ids = torch.LongTensor([encoding.ids for encoding in encodings])
-    key_padding_mask = torch.LongTensor(
-        [encoding.attention_mask for encoding in encodings]
-    )
+    key_padding_mask = torch.LongTensor([encoding.attention_mask for encoding in encodings])
     return ids, key_padding_mask
 
 
-def src(
-    tokenizer: Tokenizer, max_length: int, x2y: List[Tuple[str, str]]
-) -> torch.Tensor:
+def src(tokenizer: Tokenizer, max_length: int, x2y: List[Tuple[str, str]]) -> torch.Tensor:
     """
     returns: src (N, 2, L)
     """
@@ -47,9 +41,7 @@ def src(
     return torch.stack([src_ids, src_key_padding_mask], dim=1).long()  # (N, 2, L)
 
 
-def tgt_r(
-    tokenizer: Tokenizer, max_length: int, x2y: List[Tuple[str, str]]
-) -> torch.Tensor:
+def tgt_r(tokenizer: Tokenizer, max_length: int, x2y: List[Tuple[str, str]]) -> torch.Tensor:
     """
     return: tgt_r (N, 2, L)
     """
@@ -67,9 +59,7 @@ def tgt_r(
     return torch.stack([tgt_r_ids, tgt_r_key_padding_mask], dim=1).long()  # (N, 2, L)
 
 
-def tgt(
-    tokenizer: Tokenizer, max_length: int, x2y: List[Tuple[str, str]]
-) -> torch.Tensor:
+def tgt(tokenizer: Tokenizer, max_length: int, x2y: List[Tuple[str, str]]) -> torch.Tensor:
     sents = [y for _, y in x2y]
     tgt_ids, _ = encode(
         tokenizer,

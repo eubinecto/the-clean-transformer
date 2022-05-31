@@ -24,19 +24,11 @@ class Transformer(LightningModule):  # lgtm [py/missing-call-to-init]
         super().__init__()
         self.save_hyperparameters()
         # --- the layers to optimise --- #
-        self.token_embeddings = torch.nn.Embedding(
-            num_embeddings=vocab_size, embedding_dim=hidden_size
-        )
-        self.encoder = Encoder(
-            hidden_size, ffn_size, max_length, heads, depth, dropout
-        )  # the encoder stack
-        self.decoder = Decoder(
-            hidden_size, ffn_size, max_length, heads, depth, dropout
-        )  # the decoder stack
+        self.token_embeddings = torch.nn.Embedding(num_embeddings=vocab_size, embedding_dim=hidden_size)
+        self.encoder = Encoder(hidden_size, ffn_size, max_length, heads, depth, dropout)  # the encoder stack
+        self.decoder = Decoder(hidden_size, ffn_size, max_length, heads, depth, dropout)  # the decoder stack
         # --- constant tensors --- #
-        self.register_buffer(
-            "pos_encodings", cleanF.pos_encodings(max_length, hidden_size)
-        )  # (L, H)
+        self.register_buffer("pos_encodings", cleanF.pos_encodings(max_length, hidden_size))  # (L, H)
 
     def forward(
         self,
@@ -82,9 +74,7 @@ class Transformer(LightningModule):  # lgtm [py/missing-call-to-init]
         hidden = self.forward(
             src_ids, tgt_r_ids, src_key_padding_mask, tgt_r_key_padding_mask
         )  # ... -> (N, L, H)
-        cls = (
-            self.token_embeddings.weight
-        )  # (|V|, H) -  reuse the embeddings as the classifier
+        cls = self.token_embeddings.weight  # (|V|, H) -  reuse the embeddings as the classifier
         logits = torch.einsum("...lh,vh->...vl", hidden, cls)  # (N, |V|, L)
         loss = torchF.cross_entropy(
             logits, tgt, ignore_index=self.hparams["pad_token_id"]
@@ -108,15 +98,11 @@ class Transformer(LightningModule):  # lgtm [py/missing-call-to-init]
                 src_ids, tgt_r_ids, src_key_padding_mask, tgt_r_key_padding_mask
             )  # ... -> (N, L, H)
             cls = self.token_embeddings.weight  # (|V|, H)
-            logits = torch.einsum(
-                "...lh,vh->...lv", hidden, cls
-            )  # (N, L, H) * (|V|, H) -> (N, L, |V|)
+            logits = torch.einsum("...lh,vh->...lv", hidden, cls)  # (N, L, H) * (|V|, H) -> (N, L, |V|)
             probs = torch.softmax(logits, dim=-1)  # (N, L, |V|) -> (N, L, |V|)
             indices = torch.argmax(probs, dim=-1)  # (N, L, |V|) -> (N, L)
             tgt_r_ids[:, t + 1] = indices[:, t]  # replace paddings with the predictions
-            tgt_r_key_padding_mask[
-                :, t + 1
-            ] = 1  # next tokens should not be ignored, so mask it
+            tgt_r_key_padding_mask[:, t + 1] = 1  # next tokens should not be ignored, so mask it
         return tgt_r_ids
 
     def on_train_start(self):
@@ -128,9 +114,7 @@ class Transformer(LightningModule):  # lgtm [py/missing-call-to-init]
             if param.dim() > 1:
                 torch.nn.init.xavier_uniform_(param)
 
-    def training_step(
-        self, batch: Tuple[torch.Tensor, torch.Tensor, torch.Tensor], *args, **kwargs
-    ) -> dict:
+    def training_step(self, batch: Tuple[torch.Tensor, torch.Tensor, torch.Tensor], *args, **kwargs) -> dict:
         """
         A function for computing the loss for this batch. Calling detach() for logits and tgt is necessary
         to prevent CUDA OOM error.

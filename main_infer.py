@@ -13,15 +13,15 @@ def main():
     # fetch a pre-trained transformer & and a pre-trained tokenizer
     transformer = fetch_transformer(config['ver'])
     tokenizer = fetch_tokenizer(config['tokenizer'])
-    transformer.eval()  # otherwise, the result will be different on every run
-    x2y = [(config['src'], "")]
-    src = P.src(tokenizer, config['max_length'], x2y)
-    tgt_r = P.tgt_r(tokenizer, config['max_length'], x2y)
-    pred_ids = transformer.infer(src, tgt_r).squeeze().tolist()  # (1, L) -> (L) -> list
-    pred_ids = pred_ids[:pred_ids.index(tokenizer.eos_token_id)]  # noqa, stop at the first eos token.
-    src_ids = src[0, 1].tolist()  # (1, 2, L) -> (L) -> list
-    print(tokenizer.decode(ids=src_ids), "->", tokenizer.decode(ids=pred_ids))
-
+    with torch.no_grad():  # because this is a pipeline for inference
+        transformer.eval()  # otherwise, the result will be different on every run
+        x2y = [(config['src'], "")]
+        src = P.src(tokenizer, config['max_length'], x2y)
+        tgt_r = P.tgt_r(tokenizer, config['max_length'], x2y)
+        pred_ids = transformer.infer(src, tgt_r).squeeze().tolist()  # (1, L) -> (L) -> list
+        pred_ids = pred_ids[:pred_ids.index(tokenizer.eos_token_id)]  # noqa, stop at the first eos token.
+        src_ids = src[0, 1].tolist()  # (1, 2, L) -> (L) -> list
+    print(tokenizer.decode(ids=src_ids), "->", tokenizer.decode(ids=pred_ids))    
 
 if __name__ == '__main__':
     main()

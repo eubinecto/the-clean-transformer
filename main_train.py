@@ -66,7 +66,8 @@ def main():
                           logger=logger)
         # --- start training --- #
         trainer.fit(model=transformer,
-                    train_dataloaders=train_dataloader, val_dataloaders=val_dataloader)
+                    train_dataloaders=train_dataloader,
+                    val_dataloaders=val_dataloader)
         # --- upload the model to wandb only if the training is properly done --- #
         if not config['fast_dev_run'] and trainer.current_epoch == config['max_epochs'] - 1:
             ckpt_path = ROOT_DIR / "transformer.ckpt"

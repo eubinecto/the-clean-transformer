@@ -1,5 +1,6 @@
 from typing import Tuple, List
 import torch  # noqa
+import numpy as np
 from pytorch_lightning import LightningModule
 from cleanformer.models.decoder import Decoder
 from cleanformer.models.encoder import Encoder
@@ -42,6 +43,9 @@ class Transformer(LightningModule):  # lgtm [py/missing-call-to-init]
         return hidden
 
     def step(self, src: torch.Tensor, tgt_r: torch.Tensor, tgt: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor]:
+        """
+        An implementation of autoregressive training
+        """
         src_ids, src_key_padding_mask = src[:, 0], src[:, 1]  # (N, 2, L) -> (N, L), (N, L)
         tgt_r_ids, tgt_r_key_padding_mask = tgt_r[:, 0], tgt_r[:, 1]  # (N, 2, L) -> (N, L), (N, L)
         hidden = self.forward(src_ids, tgt_r_ids, src_key_padding_mask, tgt_r_key_padding_mask)  # ... -> (N, L, H)
@@ -54,7 +58,6 @@ class Transformer(LightningModule):  # lgtm [py/missing-call-to-init]
     def infer(self, src: torch.Tensor, tgt_r: torch.Tensor) -> torch.Tensor:
         """
         An implementation of autoregressive inference
-        :return: (N, L)
         """
         src_ids, src_key_padding_mask = src[:, 0], src[:, 1]  # (N, 2, L) -> (N, L), (N, L)
         tgt_r_ids, tgt_r_key_padding_mask = tgt_r[:, 0], tgt_r[:, 1]  # (N, 2, L) -> (N, L), (N, L)
@@ -69,54 +72,41 @@ class Transformer(LightningModule):  # lgtm [py/missing-call-to-init]
         return tgt_r_ids
 
     def on_train_start(self):
-        # many deep transformer models are initialised with so-called "Xavier initialisation"
-        # refer to: https://proceedings.mlr.press/v9/glorot10a/glorot10a.pdf
+        """
+        Deep transformer models are often initialised with so-called "Xavier initialisation"
+        https://proceedings.mlr.press/v9/glorot10a/glorot10a.pdf
+        """
         for param in self.parameters():
             if param.dim() > 1:
                 torch.nn.init.xavier_uniform_(param)
 
     def training_step(self, batch: Tuple[torch.Tensor, torch.Tensor, torch.Tensor], *args, **kwargs) -> dict:
         """
-        A function for computing the loss for this batch.
-        :return: a scalar tensor containing the loss for this batch
+        A function for computing the loss for this batch. Calling detach() for logits and tgt is necessary 
+        to prevent CUDA OOM error.
         """
         src, tgt_r, tgt = batch
         loss, logits = self.step(src, tgt_r, tgt)
-        # why detach then?
-        # A: here, we need them not for computing loss, but for computing accuracies.
-        # so, it's okay to detach the tensors from computation graph, thus saving some space in GPU
-        # (i.e. prevent "coda out of memory error")
-        # https://discuss.pytorch.org/t/cuda-out-of-memory-during-training/85014/2
         return {
             'loss': loss,
             'logits': logits.detach(),
             'tgt': tgt.detach(),
         }
 
-    def on_train_batch_end(self, outputs: dict, *args, **kwargs):
-        self.log("Train/Loss", outputs['loss'])
-
-    def training_epoch_end(self, outputs: List[dict]) -> None:
-        logits = torch.cat([out['logits'] for out in outputs],
-                              dim=0)  # noqa, num_batches * (N, C) -> (num_batches * N, C)
-        tgt = torch.cat([out['tgt'] for out in outputs], dim=0)  # # num_batches * (N,) -> (num_batches * N,)
-        self.log("Train/Accuracy", metricsF.accuracy(logits, tgt))
+    def on_train_batch_end(self, out: dict, *args, **kwargs):
+        self.log("Train/Loss", out['loss'])
+        self.log("Train/Perplexity", torch.exp(out['loss']))
+        self.log("Train/Accuracy", metricsF.accuracy(out['logits'], out['tgt']))
 
     def validation_step(self, batch: Tuple[torch.Tensor, torch.Tensor, torch.Tensor], *args, **kwargs) -> dict:
         return self.training_step(batch, *args, **kwargs)
 
-    def on_validation_batch_end(self, outputs: dict, *args, **kwargs):
-        self.log("Validation/Loss", outputs['loss'])
+    def on_validation_batch_end(self, out: dict, *args, **kwargs):
+        self.log("Validation/Loss", out['loss'])
+        self.log("Validation/Perplexity", torch.exp(out['loss']))
+        self.log("Validation/Accuracy", metricsF.accuracy(out['logits'], out['tgt']))
 
-    def validation_epoch_end(self, outputs: List[dict]) -> None:
-        logits = torch.cat([out['logits'] for out in outputs],
-                              dim=0)  # noqa, num_batches * (N, C) -> (num_batches * N, C)
-        tgt = torch.cat([out['tgt'] for out in outputs], dim=0)  # # num_batches * (N,) -> (num_batches * N,)
-        self.log("Validation/Accuracy", metricsF.accuracy(logits, tgt))
-
-    def configure_optimizers(self) -> dict:
+    def configure_optimizers(self):
         optimizer = torch.optim.Adam(params=self.parameters(), lr=self.hparams['lr'],
                                      betas=(0.9, 0.98), eps=1e-9)
-        return {
-            'optimizer': optimizer
-        }
+        return optimizer

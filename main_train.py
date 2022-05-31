@@ -39,7 +39,7 @@ def main():
     train_dataloader = DataLoader(train, batch_size=config['batch_size'],
                                   shuffle=config['shuffle'], num_workers=config['num_workers'])
     val_dataloader = DataLoader(val, batch_size=config['batch_size'],
-                                shuffle=config['shuffle'], num_workers=config['num_workers'])
+                                shuffle=False, num_workers=config['num_workers'])
     # --- instantiate the transformer to train --- #
     transformer = Transformer(config['hidden_size'],
                               config['ffn_size'],

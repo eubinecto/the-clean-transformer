@@ -6,7 +6,7 @@ from cleanformer.fetchers import fetch_config, fetch_tokenizer, fetch_transforme
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--src", type=str, default="안녕하세요.")
+    parser.add_argument("--src", type=str, default="집이 정말 편안하네요")
     args = parser.parse_args()
     config = fetch_config()["transformer"]
     config.update(vars(args))
@@ -20,7 +20,7 @@ def main():
         tgt_r = P.tgt_r(tokenizer, config["max_length"], x2y)
         pred_ids = transformer.infer(src, tgt_r).squeeze().tolist()  # (1, L) -> (L) -> list
         pred_ids = pred_ids[: pred_ids.index(tokenizer.eos_token_id)]  # noqa
-        src_ids = src[0, 1].tolist()  # (1, 2, L) -> (L) -> list
+        src_ids = src[0, 0].tolist()  # (1, 2, L) -> (L) -> list
     print(tokenizer.decode(ids=src_ids), "->", tokenizer.decode(ids=pred_ids))
 
 

@@ -22,8 +22,7 @@ def main():
     config = fetch_config()["transformer"]
     config.update(vars(args))
     tokenizer = fetch_tokenizer(config["tokenizer"])
-    transformer = fetch_transformer(config["ver"])
-    transformer.eval()
+    transformer = fetch_transformer(config["ver"], tokenizer)
     test = TensorDataset(
         P.src(tokenizer, config["max_length"], kor2eng[2]),
         P.tgt_r(tokenizer, config["max_length"], kor2eng[2]),

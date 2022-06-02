@@ -1,4 +1,4 @@
-from typing import Tuple, Optional
+from typing import Tuple
 import torch  # noqa
 from pytorch_lightning import LightningModule
 from tokenizers import Tokenizer  # noqa
@@ -21,7 +21,7 @@ class Transformer(LightningModule):  # lgtm [py/missing-call-to-init]
         depth: int,
         dropout: float,
         lr: float,  # noqa
-        tokenizer: Optional[Tokenizer] = None,  # used only for testing
+        tokenizer: Tokenizer = None,  # used only for testing
     ):
         super().__init__()
         self.save_hyperparameters(ignore="tokenizer")

@@ -1,4 +1,3 @@
-
 import torch
 
 
@@ -12,5 +11,5 @@ def main():
     print(inputs_hidden.shape)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()

@@ -1,4 +1,3 @@
-
 from cleanformer.tensors import pos_encodings
 import numpy as np
 
@@ -20,5 +19,5 @@ def main():
     print(encodings.unsqueeze(0).expand(N, -1, -1).shape)  # (L, H) -> (N, L, H)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()

@@ -8,5 +8,5 @@ def main():
     print(x.numpy())
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()

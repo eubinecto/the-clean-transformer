@@ -1,6 +1,7 @@
-from typing import Tuple
+from typing import Tuple, Optional
 import torch  # noqa
 from pytorch_lightning import LightningModule
+from tokenizers import Tokenizer  # noqa
 from cleanformer.models.decoder import Decoder
 from cleanformer.models.encoder import Encoder
 from cleanformer.models import functional as cleanF  # noqa
@@ -20,15 +21,15 @@ class Transformer(LightningModule):  # lgtm [py/missing-call-to-init]
         depth: int,
         dropout: float,
         lr: float,  # noqa
+        tokenizer: Optional[Tokenizer] = None,  # used only for testing
     ):
         super().__init__()
-        self.save_hyperparameters()
-        # --- the layers to optimise --- #
+        self.save_hyperparameters(ignore="tokenizer")
         self.token_embeddings = torch.nn.Embedding(num_embeddings=vocab_size, embedding_dim=hidden_size)
         self.encoder = Encoder(hidden_size, ffn_size, max_length, heads, depth, dropout)  # the encoder stack
         self.decoder = Decoder(hidden_size, ffn_size, max_length, heads, depth, dropout)  # the decoder stack
-        # --- constant tensors --- #
         self.register_buffer("pos_encodings", cleanF.pos_encodings(max_length, hidden_size))  # (L, H)
+        self.tokenizer = tokenizer
 
     def forward(
         self,
@@ -128,9 +129,13 @@ class Transformer(LightningModule):  # lgtm [py/missing-call-to-init]
         }
 
     def on_train_batch_end(self, out: dict, *args, **kwargs):
-        self.log("Train/Loss", out["loss"])
-        self.log("Train/Perplexity", torch.exp(out["loss"]))
-        self.log("Train/Accuracy", metricsF.accuracy(out["logits"], out["tgt"]))
+        """
+        why set both on_step & on_epoch to True?
+        https://pytorch-lightning.readthedocs.io/en/latest/common/lightning_module.html#train-epoch-level-metrics
+        """
+        self.log("Train/Loss", out["loss"], on_step=True, on_epoch=True)
+        self.log("Train/Perplexity", torch.exp(out["loss"]), on_step=True, on_epoch=True)
+        self.log("Train/Accuracy", metricsF.accuracy(out["logits"], out["tgt"]), on_step=True, on_epoch=True)
 
     def validation_step(
         self, batch: Tuple[torch.Tensor, torch.Tensor, torch.Tensor], *args, **kwargs
@@ -138,9 +143,21 @@ class Transformer(LightningModule):  # lgtm [py/missing-call-to-init]
         return self.training_step(batch, *args, **kwargs)
 
     def on_validation_batch_end(self, out: dict, *args, **kwargs):
-        self.log("Validation/Loss", out["loss"])
-        self.log("Validation/Perplexity", torch.exp(out["loss"]))
-        self.log("Validation/Accuracy", metricsF.accuracy(out["logits"], out["tgt"]))
+        self.log("Validation/Loss", out["loss"], on_step=True, on_epoch=True)
+        self.log("Validation/Perplexity", torch.exp(out["loss"]), on_step=True, on_epoch=True)
+        self.log(
+            "Validation/Accuracy", metricsF.accuracy(out["logits"], out["tgt"]), on_step=True, on_epoch=True
+        )
+
+    def test_step(self, batch: Tuple[torch.Tensor, torch.Tensor, torch.Tensor], *args, **kwargs):
+        """
+        evaluates the BLEU score of the current model
+        """
+        src, tgt_r, tgt = batch
+        tgt_hat = self.infer(src, tgt_r)  # ... ->  (N, L)
+        translations = self.tokenizer.decode_batch(tgt_hat)  # (N, L) -> (N,)
+        references = self.tokenizer.decode_batch(tgt)  # (N, L) -> (N,)
+        self.log("Test/BLEU", metricsF.bleu_score(references, translations), on_step=True, on_epoch=True)
 
     def configure_optimizers(self):
         optimizer = torch.optim.Adam(

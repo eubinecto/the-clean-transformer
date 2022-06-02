@@ -1,4 +1,3 @@
-
 from transformers import BertTokenizer
 
 
@@ -8,5 +7,5 @@ def main():
     print(tokenizer.decode(411))  # 긘
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()

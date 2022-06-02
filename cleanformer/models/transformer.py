@@ -20,8 +20,7 @@ class Transformer(LightningModule):  # lgtm [py/missing-call-to-init]
         heads: int,
         depth: int,
         dropout: float,
-        lr: float,  # noqa
-        tokenizer: Tokenizer = None,  # used only for testing
+        lr: float  # noqa
     ):
         super().__init__()
         self.save_hyperparameters(ignore="tokenizer")
@@ -29,7 +28,6 @@ class Transformer(LightningModule):  # lgtm [py/missing-call-to-init]
         self.encoder = Encoder(hidden_size, ffn_size, max_length, heads, depth, dropout)  # the encoder stack
         self.decoder = Decoder(hidden_size, ffn_size, max_length, heads, depth, dropout)  # the decoder stack
         self.register_buffer("pos_encodings", cleanF.pos_encodings(max_length, hidden_size))  # (L, H)
-        self.tokenizer = tokenizer
 
     def forward(
         self,
@@ -155,8 +153,9 @@ class Transformer(LightningModule):  # lgtm [py/missing-call-to-init]
         """
         src, tgt_r, tgt = batch
         tgt_hat = self.infer(src, tgt_r)  # ... ->  (N, L)
-        references = self.tokenizer.decode_batch(tgt.tolist())  # (N, L) -> (N,)
-        translations = self.tokenizer.decode_batch(tgt_hat.tolist())  # (N, L) -> (N,)
+        assert hasattr(self, "tokenizer"), "tokenizer must be registered before testing"
+        references = self.tokenizer.decode_batch(tgt.cpu().tolist())  # (N, L) -> (N,)
+        translations = self.tokenizer.decode_batch(tgt_hat.cpu().tolist())  # (N, L) -> (N,)
         self.log("Test/BLEU", metricsF.bleu_score(references, translations), on_step=True, on_epoch=True)
 
     def configure_optimizers(self):

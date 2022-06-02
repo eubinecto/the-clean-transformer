@@ -38,10 +38,10 @@ def fetch_tokenizer(ver: str) -> Tokenizer:
     return tokenizer
 
 
-def fetch_transformer(ver: str, tokenizer: Tokenizer = None) -> Transformer:
+def fetch_transformer(ver: str) -> Transformer:
     artifact_path = wandb.Api().artifact(f"cleanformer/transformer:{ver}", type="model").download()
     ckpt_path = path.join(artifact_path, "transformer.ckpt")
-    transformer = Transformer.load_from_checkpoint(str(ckpt_path), tokenizer=tokenizer)
+    transformer = Transformer.load_from_checkpoint(str(ckpt_path))
     return transformer
 
 

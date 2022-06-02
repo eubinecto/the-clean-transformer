@@ -23,7 +23,8 @@ def main():
     config = fetch_config()["transformer"]
     config.update(vars(args))
     tokenizer = fetch_tokenizer(config["tokenizer"])
-    transformer = fetch_transformer(config["ver"], tokenizer)
+    transformer = fetch_transformer(config["ver"])
+    transformer.tokenizer = tokenizer
     test = TensorDataset(
         P.src(tokenizer, config["max_length"], kor2eng[2]),
         P.tgt_r(tokenizer, config["max_length"], kor2eng[2]),
@@ -42,7 +43,7 @@ def main():
         trainer = Trainer(
             max_epochs=1,  # test over one epoch
             fast_dev_run=config["fast_dev_run"],
-            gpus=None,  # do not use GPUs' for this
+            gpus=torch.cuda.device_count(),
             logger=logger,
         )
         # start testing here

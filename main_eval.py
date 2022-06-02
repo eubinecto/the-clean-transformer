@@ -17,6 +17,7 @@ os.environ["TOKENIZERS_PARALLELISM"] = "true"
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--num_workers", type=int, default=os.cpu_count())
+    parser.add_argument("--fast_dev_run", action="store_true", default=False)
     args = parser.parse_args()
     kor2eng = fetch_kor2eng()
     config = fetch_config()["transformer"]
@@ -40,7 +41,8 @@ def main():
         logger = WandbLogger()
         trainer = Trainer(
             max_epochs=1,  # test over one epoch
-            gpus=torch.cuda.device_count(),
+            fast_dev_run=config["fast_dev_run"],
+            gpus=None,  # do not use GPUs' for this
             logger=logger,
         )
         # start testing here

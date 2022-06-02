@@ -155,8 +155,8 @@ class Transformer(LightningModule):  # lgtm [py/missing-call-to-init]
         """
         src, tgt_r, tgt = batch
         tgt_hat = self.infer(src, tgt_r)  # ... ->  (N, L)
-        translations = self.tokenizer.decode_batch(tgt_hat)  # (N, L) -> (N,)
-        references = self.tokenizer.decode_batch(tgt)  # (N, L) -> (N,)
+        references = self.tokenizer.decode_batch(tgt.tolist())  # (N, L) -> (N,)
+        translations = self.tokenizer.decode_batch(tgt_hat.tolist())  # (N, L) -> (N,)
         self.log("Test/BLEU", metricsF.bleu_score(references, translations), on_step=True, on_epoch=True)
 
     def configure_optimizers(self):

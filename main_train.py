@@ -12,6 +12,7 @@ from cleanformer.callbacks import LogMetricsCallback, LogBLEUCallback
 from cleanformer.fetchers import fetch_tokenizer, fetch_config, fetch_kor2eng
 from cleanformer.models.transformer import Transformer
 from cleanformer.paths import WANDB_DIR
+
 # to suppress warnings - we just allow parallelism
 # https://github.com/kakaobrain/pororo/issues/69#issuecomment-927564132
 os.environ["TOKENIZERS_PARALLELISM"] = "true"
@@ -74,27 +75,30 @@ def main():
     # --- start wandb context --- #
     with wandb.init(project="cleanformer", config=config):
         # --- prepare a logger (wandb) and a trainer to use --- #
-        logger = WandbLogger(log_model="all",
-                             save_dir=WANDB_DIR)
+        logger = WandbLogger(log_model="all", save_dir=WANDB_DIR)
         trainer = Trainer(
             logger=logger,
             fast_dev_run=config["fast_dev_run"],
-            limit_train_batches=config['limit_train_batches'],
-            limit_val_batches=config['limit_val_batches'],
+            limit_train_batches=config["limit_train_batches"],
+            limit_val_batches=config["limit_val_batches"],
             check_val_every_n_epoch=config["check_val_every_n_epoch"],
             overfit_batches=config["overfit_batches"],
             log_every_n_steps=config["log_every_n_steps"],
-            max_epochs=config['max_epochs'],
+            max_epochs=config["max_epochs"],
             gpus=torch.cuda.device_count(),
-            callbacks=[ModelCheckpoint(verbose=True,
-                                       monitor=config['monitor'],
-                                       mode=config['mode'],
-                                       save_top_k=config['save_top_k'],
-                                       every_n_epochs=config['every_n_epochs'],
-                                       save_on_train_epoch_end=config['save_on_train_epoch_end']),
-                       LearningRateMonitor(logging_interval="epoch"),
-                       LogMetricsCallback(),
-                       LogBLEUCallback(logger, tokenizer)],
+            callbacks=[
+                ModelCheckpoint(
+                    verbose=True,
+                    monitor=config["monitor"],
+                    mode=config["mode"],
+                    save_top_k=config["save_top_k"],
+                    every_n_epochs=config["every_n_epochs"],
+                    save_on_train_epoch_end=config["save_on_train_epoch_end"],
+                ),
+                LearningRateMonitor(logging_interval="epoch"),
+                LogMetricsCallback(),
+                LogBLEUCallback(logger, tokenizer),
+            ],
         )
         # --- start training --- #
         trainer.fit(

@@ -20,7 +20,7 @@ class Transformer(LightningModule):  # lgtm [py/missing-call-to-init]
         heads: int,
         depth: int,
         dropout: float,
-        lr: float  # noqa
+        lr: float,  # noqa
     ):
         super().__init__()
         self.save_hyperparameters(ignore="tokenizer")
@@ -76,8 +76,10 @@ class Transformer(LightningModule):  # lgtm [py/missing-call-to-init]
         cls = self.token_embeddings.weight  # (|V|, H) -  reuse the embeddings as the classifier
         logits = torch.einsum("...lh,vh->...vl", hidden, cls)  # (N, |V|, L)
         losses = torchF.cross_entropy(
-            logits, tgt, ignore_index=self.hparams["pad_token_id"],
-            reduction='none'  # so that we can explore batches by loss
+            logits,
+            tgt,
+            ignore_index=self.hparams["pad_token_id"],
+            reduction="none",  # so that we can explore batches by loss
         )  # (N, |V|, L), (N, L) -> (N, L)
         return losses, logits
 
@@ -115,16 +117,13 @@ class Transformer(LightningModule):  # lgtm [py/missing-call-to-init]
                 torch.nn.init.xavier_uniform_(param)
 
     def training_step(self, batch: Tuple[torch.Tensor, torch.Tensor, torch.Tensor], *args, **kwargs) -> dict:
-        """
-        A function for computing the loss for this batch. Calling detach() for logits and tgt is necessary
-        to prevent CUDA OOM error.
-        """
         src, tgt_r, tgt = batch
         losses, logits = self.step(src, tgt_r, tgt)
         return {
-            "loss": losses.sum(),  # (N,) -> (1,)
-            "logits": logits.detach(),
-            "tgt": tgt.detach(),
+            "loss": losses.sum(),  # (N, L) -> (1,)
+            # for logging purposes
+            "losses": losses.detach(),  # (N, L)
+            "logits": logits.detach(),  # (N, L)
         }
 
     @torch.no_grad()
@@ -135,13 +134,10 @@ class Transformer(LightningModule):  # lgtm [py/missing-call-to-init]
 
     @torch.no_grad()
     def test_step(self, batch: Tuple[torch.Tensor, torch.Tensor, torch.Tensor], *args, **kwargs) -> dict:
-        """
-        evaluates the BLEU score of the current model
-        """
-        src, tgt_r, tgt = batch
+        src, tgt_r, _ = batch
         tgt_hat = self.infer(src, tgt_r)  # ... ->  (N, L)
         return {
-            "tgt":  tgt,
+            # for logging purposes
             "tgt_hat": tgt_hat
         }
 

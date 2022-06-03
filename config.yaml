@@ -1,6 +1,5 @@
 # --- config for training a transformer --- #
 transformer:
-  desc: "Fully overfitted to kor2eng dataset. Not sure how many epochs we may need, so we first start with 30."
   best: "transformer:overfit"
   hidden_size: 512
   ffn_size: 512
@@ -12,14 +11,14 @@ transformer:
   dropout: 0.0
   seed: 410
   shuffle: true
-  tokenizer: "tokenizer:wp"
+  tokenizer: "tokenizer:v19"
   monitor: Validation/Loss_epoch
   mode: min
 
 # --- config for building a tokenizer --- #
 tokenizer:
-  ver: wp
-  vocab_size: 20000
+  algorithm: wordpiece
+  vocab_size: 16000
   pad: "[PAD]"
   pad_id: 0
   unk: "[UNK]"

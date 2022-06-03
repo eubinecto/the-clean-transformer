@@ -20,24 +20,18 @@ from tokenizers.trainers import BpeTrainer, WordPieceTrainer  # noqa
 from cleanformer.paths import ROOT_DIR
 from cleanformer.fetchers import fetch_config, fetch_kor2eng
 
+os.environ["TOKENIZERS_PARALLELISM"] = "true"
+
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--ver", type=str, default="wp")
     args = parser.parse_args()
     config = fetch_config()["tokenizer"]
     config.update(vars(args))
     # --- prepare a tokenizer --- #
     special_tokens = [config["pad"], config["unk"], config["bos"], config["eos"]]
-    if config["ver"] == "bpe":
-        # tokenizer = Tokenizer(BPE(unk_token=config['unk']))
-        tokenizer = Tokenizer(BPE(unk_token=config["unk"]))
-        trainer = BpeTrainer(vocab_size=config["vocab_size"], special_tokens=special_tokens)
-    elif config["ver"] == "wp":
-        tokenizer = Tokenizer(WordPiece(unk_token=config["unk"]))  # noqa
-        trainer = WordPieceTrainer(vocab_size=config["vocab_size"], special_tokens=special_tokens)
-    else:
-        raise ValueError(f"Invalid ver: {config['ver']}")
+    tokenizer = Tokenizer(WordPiece(unk_token=config["unk"]))  # noqa
+    trainer = WordPieceTrainer(vocab_size=config["vocab_size"], special_tokens=special_tokens)
     # --- pre & post processing --- #
     tokenizer.pre_tokenizer = pre_tokenizers.Sequence([Whitespace(), Digits(), Punctuation()])  # noqa
     tokenizer.normalizer = normalizers.Sequence([Lowercase()])  # noqa
@@ -61,7 +55,7 @@ def main():
         tokenizer.save(str(json_path), pretty=True)  # noqa
         artifact = wandb.Artifact(name="tokenizer", type="other", metadata=config)
         artifact.add_file(str(json_path))
-        run.log_artifact(artifact, aliases=["latest", config["ver"]])
+        run.log_artifact(artifact)
         os.remove(str(json_path))  # make sure you delete it after you are done with uploading it
 
 

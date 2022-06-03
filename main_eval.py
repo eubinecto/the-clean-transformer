@@ -46,7 +46,7 @@ def main():
             fast_dev_run=config["fast_dev_run"],
             gpus=torch.cuda.device_count(),
             logger=logger,
-            callbacks=[LogBLEUCallback(logger, tokenizer)]
+            callbacks=[LogBLEUCallback(logger, tokenizer)],
         )
         # start testing here
         trainer.test(model=transformer, dataloaders=test_dataloader)

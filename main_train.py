@@ -29,9 +29,9 @@ def main():
     required.add_argument("--check_val_every_n_epoch", type=int, required=True)
     optional = parser.add_argument_group("optional arguments")
     optional.add_argument("--fast_dev_run", action="store_true", default=False)
-    optional.add_argument("--overfit_batches", type=int, default=0)
-    optional.add_argument("--limit_train_batches", type=int, default=0)
-    optional.add_argument("--limit_val_batches", type=int, default=0)
+    optional.add_argument("--overfit_batches", type=int, default=0.0)
+    optional.add_argument("--limit_train_batches", type=int, default=1.0)
+    optional.add_argument("--limit_val_batches", type=int, default=1.0)
     optional.add_argument("--num_workers", type=int, default=os.cpu_count())
     args = parser.parse_args()
     config = fetch_config()["transformer"]

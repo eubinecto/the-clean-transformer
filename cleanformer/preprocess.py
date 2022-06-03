@@ -51,7 +51,7 @@ def tgt_r(tokenizer: Tokenizer, max_length: int, x2y: List[Tuple[str, str]]) -> 
         tokenizer,
         max_length,
         [
-            # starts with bos, but does not end with eos (pad token is ignored anyways)
+            # starts with bos, but does not end with eos (pad token is ignored anyway)
             tokenizer.bos_token + " " + sent  # noqa
             for sent in sents
         ],

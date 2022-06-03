@@ -9,7 +9,6 @@ https://huggingface.co/docs/tokenizers/python/latest/components.html
 """
 import os
 import wandb
-import argparse
 from itertools import chain
 from tokenizers import pre_tokenizers, normalizers  # noqa
 from tokenizers import Tokenizer  # noqa
@@ -24,10 +23,7 @@ os.environ["TOKENIZERS_PARALLELISM"] = "true"
 
 
 def main():
-    parser = argparse.ArgumentParser()
-    args = parser.parse_args()
     config = fetch_config()["tokenizer"]
-    config.update(vars(args))
     # --- prepare a tokenizer --- #
     special_tokens = [config["pad"], config["unk"], config["bos"], config["eos"]]
     tokenizer = Tokenizer(WordPiece(unk_token=config["unk"]))  # noqa
@@ -36,7 +32,7 @@ def main():
     tokenizer.pre_tokenizer = pre_tokenizers.Sequence([Whitespace(), Digits(), Punctuation()])  # noqa
     tokenizer.normalizer = normalizers.Sequence([Lowercase()])  # noqa
     # --- prepare the data --- #
-    kor2eng_train, kor2eng_val, kor2eng_test = fetch_kor2eng()
+    kor2eng_train, kor2eng_val, kor2eng_test = fetch_kor2eng(config['kor2eng'])
     # chaining two generators;  https://stackoverflow.com/a/3211047
     iterator = chain(
         (kor for kor, _ in kor2eng_train),

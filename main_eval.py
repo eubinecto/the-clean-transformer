@@ -21,11 +21,11 @@ def main():
     parser.add_argument("--num_workers", type=int, default=os.cpu_count())
     parser.add_argument("--fast_dev_run", action="store_true", default=False)
     args = parser.parse_args()
-    kor2eng = fetch_kor2eng()
     config = fetch_config()["transformer"]
     config.update(vars(args))
     transformer = fetch_transformer(config["best"])
     tokenizer = fetch_tokenizer(config["tokenizer"])
+    kor2eng = fetch_kor2eng(tokenizer.kor2eng)  # noqa
     test = TensorDataset(
         P.src(tokenizer, config["max_length"], kor2eng[2]),
         P.tgt_r(tokenizer, config["max_length"], kor2eng[2]),

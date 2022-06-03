@@ -8,17 +8,16 @@ import yaml  # noqa
 from typing import Tuple, List
 from Korpora import KoreanParallelKOENNewsKorpus  # noqa
 from tokenizers import Tokenizer  # noqa
-from cleanformer.paths import CONFIG_YAML, KORPORA_DIR
+from cleanformer.paths import CONFIG_YAML
 from cleanformer.models.transformer import Transformer
 
 
-def fetch_kor2eng() -> Tuple[List[Tuple[str, str]], List[Tuple[str, str]], List[Tuple[str, str]]]:
-    # download the data
-    korpus = KoreanParallelKOENNewsKorpus(root_dir=str(KORPORA_DIR))
-    kor2eng_train = list(zip(korpus.train.texts, korpus.train.pairs))
-    kor2eng_val = list(zip(korpus.dev.texts, korpus.dev.pairs))
-    kor2eng_test = list(zip(korpus.test.texts, korpus.test.pairs))
-    return kor2eng_train, kor2eng_val, kor2eng_test
+def fetch_kor2eng(name: str) -> Tuple[List[Tuple[str, str]], List[Tuple[str, str]], List[Tuple[str, str]]]:
+    artifact = wandb.Api().artifact(f"cleanformer/{name}", type="dataset")
+    train = [(row[0], row[1]) for row in artifact.get("train").data]
+    val = [(row[0], row[1]) for row in artifact.get("val").data]
+    test = [(row[0], row[1]) for row in artifact.get("test").data]
+    return train, val, test
 
 
 def fetch_tokenizer(name: str) -> Tokenizer:
@@ -35,6 +34,7 @@ def fetch_tokenizer(name: str) -> Tokenizer:
     tokenizer.bos_token_id = artifact.metadata["bos_id"]
     tokenizer.eos_token = artifact.metadata["eos"]
     tokenizer.eos_token_id = artifact.metadata["eos_id"]
+    tokenizer.kor2eng = artifact.metadata['kor2eng']
     return tokenizer
 
 

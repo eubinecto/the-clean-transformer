@@ -31,5 +31,5 @@ def main():
     print([tokenizer.id_to_token(tgt_id) for tgt_id in tgt_ids.squeeze().tolist()])
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()

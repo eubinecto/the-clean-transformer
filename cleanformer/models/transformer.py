@@ -1,6 +1,7 @@
 from typing import Tuple
 import torch  # noqa
 from pytorch_lightning import LightningModule
+from tokenizers import Tokenizer  # noqa
 from cleanformer.models.decoder import Decoder
 from cleanformer.models.encoder import Encoder
 from cleanformer.models import functional as cleanF  # noqa
@@ -22,12 +23,10 @@ class Transformer(LightningModule):  # lgtm [py/missing-call-to-init]
         lr: float,  # noqa
     ):
         super().__init__()
-        self.save_hyperparameters()
-        # --- the layers to optimise --- #
+        self.save_hyperparameters(ignore="tokenizer")
         self.token_embeddings = torch.nn.Embedding(num_embeddings=vocab_size, embedding_dim=hidden_size)
         self.encoder = Encoder(hidden_size, ffn_size, max_length, heads, depth, dropout)  # the encoder stack
         self.decoder = Decoder(hidden_size, ffn_size, max_length, heads, depth, dropout)  # the decoder stack
-        # --- constant tensors --- #
         self.register_buffer("pos_encodings", cleanF.pos_encodings(max_length, hidden_size))  # (L, H)
 
     def forward(
@@ -76,10 +75,13 @@ class Transformer(LightningModule):  # lgtm [py/missing-call-to-init]
         )  # ... -> (N, L, H)
         cls = self.token_embeddings.weight  # (|V|, H) -  reuse the embeddings as the classifier
         logits = torch.einsum("...lh,vh->...vl", hidden, cls)  # (N, |V|, L)
-        loss = torchF.cross_entropy(
-            logits, tgt, ignore_index=self.hparams["pad_token_id"]
-        ).sum()  # (N, |V|, L), (N, L) -> (N, 1) -> (1)
-        return loss, logits
+        losses = torchF.cross_entropy(
+            logits,
+            tgt,
+            ignore_index=self.hparams["pad_token_id"],
+            reduction="none",  # so that we can explore batches by loss
+        )  # (N, |V|, L), (N, L) -> (N, L)
+        return losses, logits
 
     def infer(self, src: torch.Tensor, tgt_r: torch.Tensor) -> torch.Tensor:
         """
@@ -115,32 +117,29 @@ class Transformer(LightningModule):  # lgtm [py/missing-call-to-init]
                 torch.nn.init.xavier_uniform_(param)
 
     def training_step(self, batch: Tuple[torch.Tensor, torch.Tensor, torch.Tensor], *args, **kwargs) -> dict:
-        """
-        A function for computing the loss for this batch. Calling detach() for logits and tgt is necessary
-        to prevent CUDA OOM error.
-        """
         src, tgt_r, tgt = batch
-        loss, logits = self.step(src, tgt_r, tgt)
+        losses, logits = self.step(src, tgt_r, tgt)
         return {
-            "loss": loss,
-            "logits": logits.detach(),
-            "tgt": tgt.detach(),
+            "loss": losses.sum(),  # (N, L) -> (1,)
+            # for logging purposes
+            "losses": losses.detach(),  # (N, L)
+            "logits": logits.detach(),  # (N, L)
         }
 
-    def on_train_batch_end(self, out: dict, *args, **kwargs):
-        self.log("Train/Loss", out["loss"])
-        self.log("Train/Perplexity", torch.exp(out["loss"]))
-        self.log("Train/Accuracy", metricsF.accuracy(out["logits"], out["tgt"]))
-
+    @torch.no_grad()
     def validation_step(
         self, batch: Tuple[torch.Tensor, torch.Tensor, torch.Tensor], *args, **kwargs
     ) -> dict:
         return self.training_step(batch, *args, **kwargs)
 
-    def on_validation_batch_end(self, out: dict, *args, **kwargs):
-        self.log("Validation/Loss", out["loss"])
-        self.log("Validation/Perplexity", torch.exp(out["loss"]))
-        self.log("Validation/Accuracy", metricsF.accuracy(out["logits"], out["tgt"]))
+    @torch.no_grad()
+    def test_step(self, batch: Tuple[torch.Tensor, torch.Tensor, torch.Tensor], *args, **kwargs) -> dict:
+        src, tgt_r, _ = batch
+        tgt_hat = self.infer(src, tgt_r)  # ... ->  (N, L)
+        return {
+            # for logging purposes
+            "tgt_hat": tgt_hat
+        }
 
     def configure_optimizers(self):
         optimizer = torch.optim.Adam(

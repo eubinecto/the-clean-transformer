@@ -8,5 +8,5 @@ def main():
     print(positions.repeat(N, 1).shape)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()

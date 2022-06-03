@@ -11,7 +11,7 @@ def main():
     config = fetch_config()["transformer"]
     config.update(vars(args))
     # fetch a pre-trained transformer & and a pre-trained tokenizer
-    transformer = fetch_transformer(config["ver"])
+    transformer = fetch_transformer(config["best"])
     tokenizer = fetch_tokenizer(config["tokenizer"])
     with torch.no_grad():
         transformer.eval()  # otherwise, the result will be different on every run

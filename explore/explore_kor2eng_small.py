@@ -4,8 +4,8 @@ from cleanformer.fetchers import fetch_config
 
 def main():
     ver = "overfit_small"
-    config = fetch_config()['train'][ver]
-    config.update({'num_workers': 2})
+    config = fetch_config()["train"][ver]
+    config.update({"num_workers": 2})
     datamodule = Kor2EngSmallDataModule(config, None)  # noqa
     datamodule.prepare_data()
     # --- explore some data --- #
@@ -13,5 +13,5 @@ def main():
         print(pair)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()

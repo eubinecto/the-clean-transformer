@@ -1,15 +1,17 @@
 import argparse
 import os
+import shutil
 import torch  # noqa
 import wandb
 from pytorch_lightning import Trainer
-from pytorch_lightning.callbacks import LearningRateMonitor
+from pytorch_lightning.callbacks import LearningRateMonitor, ModelCheckpoint
 from pytorch_lightning.loggers import WandbLogger
 from torch.utils.data import DataLoader, TensorDataset  # noqa
 from cleanformer import preprocess as P  # noqa
+from cleanformer.callbacks import LogMetricsCallback, LogBLEUCallback
 from cleanformer.fetchers import fetch_tokenizer, fetch_config, fetch_kor2eng
 from cleanformer.models.transformer import Transformer
-from cleanformer.paths import ROOT_DIR
+from cleanformer.paths import WANDB_DIR
 
 # to suppress warnings - we just allow parallelism
 # https://github.com/kakaobrain/pororo/issues/69#issuecomment-927564132
@@ -18,10 +20,16 @@ os.environ["TOKENIZERS_PARALLELISM"] = "true"
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--num_workers", type=int, default=os.cpu_count())
-    parser.add_argument("--log_every_n_steps", type=int, default=1)
     parser.add_argument("--fast_dev_run", action="store_true", default=False)
     parser.add_argument("--overfit_batches", type=int, default=0)
+    parser.add_argument("--limit_train_batches", type=int, default=None)
+    parser.add_argument("--limit_val_batches", type=int, default=None)
+    parser.add_argument("--max_epochs", type=int, default=90)
+    parser.add_argument("--num_workers", type=int, default=os.cpu_count())
+    parser.add_argument("--save_top_k", type=int, default=3)
+    parser.add_argument("--save_on_train_epoch_end", type=int, default=1)
+    parser.add_argument("--every_n_epochs", type=int, default=1)
+    parser.add_argument("--log_every_n_steps", type=int, default=1)
     parser.add_argument("--check_val_every_n_epoch", type=int, default=5)
     args = parser.parse_args()
     config = fetch_config()["transformer"]
@@ -65,20 +73,32 @@ def main():
         config["lr"],
     )
     # --- start wandb context --- #
-    with wandb.init(project="cleanformer", config=config) as run:
+    with wandb.init(project="cleanformer", config=config, tags=[__file__]):
         # --- prepare a logger (wandb) and a trainer to use --- #
-        logger = WandbLogger(log_model=False)
-        lr_monitor = LearningRateMonitor(logging_interval="epoch")
+        logger = WandbLogger(log_model="all", save_dir=WANDB_DIR)
         trainer = Trainer(
+            logger=logger,
             fast_dev_run=config["fast_dev_run"],
+            limit_train_batches=config["limit_train_batches"],
+            limit_val_batches=config["limit_val_batches"],
             check_val_every_n_epoch=config["check_val_every_n_epoch"],
             overfit_batches=config["overfit_batches"],
-            max_epochs=config["max_epochs"],
             log_every_n_steps=config["log_every_n_steps"],
+            max_epochs=config["max_epochs"],
             gpus=torch.cuda.device_count(),
-            callbacks=[lr_monitor],
-            enable_checkpointing=False,
-            logger=logger,
+            callbacks=[
+                ModelCheckpoint(
+                    verbose=True,
+                    monitor=config["monitor"],
+                    mode=config["mode"],
+                    save_top_k=config["save_top_k"],
+                    every_n_epochs=config["every_n_epochs"],
+                    save_on_train_epoch_end=config["save_on_train_epoch_end"],
+                ),
+                LearningRateMonitor(logging_interval="epoch"),
+                LogMetricsCallback(),
+                LogBLEUCallback(logger, tokenizer),
+            ],
         )
         # --- start training --- #
         trainer.fit(
@@ -86,14 +106,8 @@ def main():
             train_dataloaders=train_dataloader,
             val_dataloaders=val_dataloader,
         )
-        # --- upload the model to wandb only if the training is properly done --- #
-        if not config["fast_dev_run"] and not trainer.interrupted:
-            ckpt_path = ROOT_DIR / "transformer.ckpt"
-            trainer.save_checkpoint(str(ckpt_path))
-            artifact = wandb.Artifact(name="transformer", type="model", metadata=config)
-            artifact.add_file(str(ckpt_path))
-            run.log_artifact(artifact, aliases=["latest", config["ver"]])
-            os.remove(str(ckpt_path))  # make sure you remove it after you are done with uploading it
+    # sweep local logs after uploading is done
+    shutil.rmtree(WANDB_DIR)
 
 
 if __name__ == "__main__":

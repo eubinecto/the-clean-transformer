@@ -14,5 +14,5 @@ def main():
     print(dataset[11])  # should return an error, of course
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()

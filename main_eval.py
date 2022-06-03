@@ -38,7 +38,7 @@ def main():
         num_workers=config["num_workers"],
     )
     # --- start wandb context --- #
-    with wandb.init(project="cleanformer", config=config):
+    with wandb.init(project="cleanformer", config=config, tags=[__file__]):
         # --- prepare a logger (wandb) and a trainer to use --- #
         logger = WandbLogger()
         trainer = Trainer(

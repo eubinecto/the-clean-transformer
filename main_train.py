@@ -73,7 +73,7 @@ def main():
         config["lr"],
     )
     # --- start wandb context --- #
-    with wandb.init(project="cleanformer", config=config):
+    with wandb.init(project="cleanformer", config=config, tags=[__file__]):
         # --- prepare a logger (wandb) and a trainer to use --- #
         logger = WandbLogger(log_model="all", save_dir=WANDB_DIR)
         trainer = Trainer(

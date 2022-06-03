@@ -37,16 +37,16 @@ def main():
     # --- fetch a pre-trained tokenizer from wandb -- #
     tokenizer = fetch_tokenizer(config["tokenizer"])
     # --- prepare the dataloaders --- #
-    kor2eng = fetch_kor2eng()
+    train, val, _ = fetch_kor2eng(tokenizer.kor2eng)  # noqa
     train = TensorDataset(
-        P.src(tokenizer, config["max_length"], kor2eng[0]),
-        P.tgt_r(tokenizer, config["max_length"], kor2eng[0]),
-        P.tgt(tokenizer, config["max_length"], kor2eng[0]),
+        P.src(tokenizer, config["max_length"], train),
+        P.tgt_r(tokenizer, config["max_length"], train),
+        P.tgt(tokenizer, config["max_length"], train),
     )
     val = TensorDataset(
-        P.src(tokenizer, config["max_length"], kor2eng[1]),
-        P.tgt_r(tokenizer, config["max_length"], kor2eng[1]),
-        P.tgt(tokenizer, config["max_length"], kor2eng[1]),
+        P.src(tokenizer, config["max_length"], val),
+        P.tgt_r(tokenizer, config["max_length"], val),
+        P.tgt(tokenizer, config["max_length"], val),
     )
     train_dataloader = DataLoader(
         train,

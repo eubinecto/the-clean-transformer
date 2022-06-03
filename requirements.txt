@@ -1,3 +1,4 @@
 pytorch-lightning==1.6.3
 wandb==0.12.17
 tokenizers==0.10.3
+korpora==0.2.0

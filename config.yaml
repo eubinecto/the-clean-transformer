@@ -5,19 +5,20 @@ transformer:
   ffn_size: 512
   heads: 32
   depth: 3
-  max_length: 145
+  max_length: 149
   batch_size: 3
   lr: 0.0001
   dropout: 0.0
   seed: 410
   shuffle: true
-  tokenizer: "tokenizer:v19"
+  tokenizer: "tokenizer:v20"
   monitor: Validation/Loss_epoch
   mode: min
 
 # --- config for building a tokenizer --- #
 tokenizer:
   algorithm: wordpiece
+  kor2eng: "kor2eng:v0"
   vocab_size: 16000
   pad: "[PAD]"
   pad_id: 0
@@ -30,4 +31,4 @@ tokenizer:
 
 # --- config for building a dataset --- #
 kor2eng:
-  ver: ...
+  # TODO: do this later, when you need preprocessing the dataset (e.g. upsampling)

@@ -4,10 +4,10 @@ Korpora 에서도 fetch 라고 표현한다: https://github.com/ko-nlp/Korpora
 """
 from os import path
 import wandb
-import yaml
+import yaml  # noqa
 from typing import Tuple, List
-from Korpora import KoreanParallelKOENNewsKorpus
-from tokenizers import Tokenizer
+from Korpora import KoreanParallelKOENNewsKorpus  # noqa
+from tokenizers import Tokenizer  # noqa
 from cleanformer.paths import CONFIG_YAML, KORPORA_DIR
 from cleanformer.models.transformer import Transformer
 
@@ -21,8 +21,8 @@ def fetch_kor2eng() -> Tuple[List[Tuple[str, str]], List[Tuple[str, str]], List[
     return kor2eng_train, kor2eng_val, kor2eng_test
 
 
-def fetch_tokenizer(ver: str) -> Tokenizer:
-    artifact = wandb.Api().artifact(f"cleanformer/tokenizer:{ver}", type="other")
+def fetch_tokenizer(name: str) -> Tokenizer:
+    artifact = wandb.Api().artifact(f"cleanformer/{name}", type="other")
     artifact_path = artifact.download()
     json_path = path.join(artifact_path, "tokenizer.json")
     tokenizer = Tokenizer.from_file(str(json_path))
@@ -38,8 +38,8 @@ def fetch_tokenizer(ver: str) -> Tokenizer:
     return tokenizer
 
 
-def fetch_transformer(ver: str) -> Transformer:
-    artifact_path = wandb.Api().artifact(f"cleanformer/transformer:{ver}", type="model").download()
+def fetch_transformer(name: str) -> Transformer:
+    artifact_path = wandb.Api().artifact(f"cleanformer/{name}", type="model").download()
     ckpt_path = path.join(artifact_path, "transformer.ckpt")
     transformer = Transformer.load_from_checkpoint(str(ckpt_path))
     return transformer

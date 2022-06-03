@@ -1,19 +1,20 @@
 # --- config for training a transformer --- #
 transformer:
-  ver: overfit
   desc: "Fully overfitted to kor2eng dataset. Not sure how many epochs we may need, so we first start with 30."
+  best: "transformer:overfit"
   hidden_size: 512
   ffn_size: 512
   heads: 32
   depth: 3
-  max_epochs: 30
   max_length: 145
-  batch_size: 64
+  batch_size: 3
   lr: 0.0001
   dropout: 0.0
   seed: 410
   shuffle: true
-  tokenizer: wp
+  tokenizer: "tokenizer:wp"
+  monitor: Validation/Loss_epoch
+  mode: min
 
 # --- config for building a tokenizer --- #
 tokenizer:
@@ -28,3 +29,6 @@ tokenizer:
   eos: "[EOS]"
   eos_id: 3
 
+# --- config for building a dataset --- #
+kor2eng:
+  ver: ...

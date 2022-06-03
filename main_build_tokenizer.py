@@ -25,7 +25,7 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--ver", type=str, default="wp")
     args = parser.parse_args()
-    config = fetch_config()["build"]
+    config = fetch_config()["tokenizer"]
     config.update(vars(args))
     # --- prepare a tokenizer --- #
     special_tokens = [config["pad"], config["unk"], config["bos"], config["eos"]]

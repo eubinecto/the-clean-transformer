@@ -22,7 +22,7 @@ def main():
     parser = argparse.ArgumentParser()
     required = parser.add_argument_group("required arguments")
     required.add_argument("--max_epochs", type=int, required=True)
-    required.add_argument("--save_top_k", type=int, required=True)
+    required.add_argument("--batch_size", type=int, required=True)
     required.add_argument("--save_on_train_epoch_end", type=int, required=True)
     required.add_argument("--every_n_epochs", type=int, required=True)
     required.add_argument("--log_every_n_steps", type=int, required=True)
@@ -63,17 +63,11 @@ def main():
         num_workers=config["num_workers"],
     )
     # --- instantiate the transformer to train --- #
-    transformer = Transformer(
-        config["hidden_size"],
-        config["ffn_size"],
-        tokenizer.get_vocab_size(),  # vocab_size
-        config["max_length"],
-        tokenizer.pad_token_id,  # noqa
-        config["heads"],
-        config["depth"],
-        config["dropout"],
-        config["lr"],
-    )
+    config.update({
+        "vocab_size": tokenizer.get_vocab_size(),
+        "pad_token_id": tokenizer.pad_token_id  # noqa
+    })
+    transformer = Transformer(**config)
     # --- start wandb context --- #
     with wandb.init(project="cleanformer", config=config, tags=[__file__]):
         # --- prepare a logger (wandb) and a trainer to use --- #
@@ -91,9 +85,6 @@ def main():
             callbacks=[
                 ModelCheckpoint(
                     verbose=True,
-                    monitor=config["monitor"],
-                    mode=config["mode"],
-                    save_top_k=config["save_top_k"],
                     every_n_epochs=config["every_n_epochs"],
                     save_on_train_epoch_end=config["save_on_train_epoch_end"],
                 ),

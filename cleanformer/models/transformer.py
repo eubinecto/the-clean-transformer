@@ -2,11 +2,12 @@ from typing import Tuple
 import torch  # noqa
 from pytorch_lightning import LightningModule
 from tokenizers import Tokenizer  # noqa
+from torch.optim.lr_scheduler import ReduceLROnPlateau  # noqa
+from torchmetrics import functional as metricsF  # noqa
+from torch.nn import functional as torchF  # noqa
 from cleanformer.models.decoder import Decoder
 from cleanformer.models.encoder import Encoder
 from cleanformer.models import functional as cleanF  # noqa
-from torch.nn import functional as torchF  # noqa
-from torchmetrics import functional as metricsF  # noqa
 
 
 class Transformer(LightningModule):  # lgtm [py/missing-call-to-init]
@@ -21,9 +22,10 @@ class Transformer(LightningModule):  # lgtm [py/missing-call-to-init]
         depth: int,
         dropout: float,
         lr: float,  # noqa
+        **kwargs  # noqa
     ):
         super().__init__()
-        self.save_hyperparameters(ignore="tokenizer")
+        self.save_hyperparameters()
         self.token_embeddings = torch.nn.Embedding(num_embeddings=vocab_size, embedding_dim=hidden_size)
         self.encoder = Encoder(hidden_size, ffn_size, max_length, heads, depth, dropout)  # the encoder stack
         self.decoder = Decoder(hidden_size, ffn_size, max_length, heads, depth, dropout)  # the decoder stack
@@ -135,8 +137,26 @@ class Transformer(LightningModule):  # lgtm [py/missing-call-to-init]
     def test_step(self, batch: Tuple[torch.Tensor, torch.Tensor, torch.Tensor], *args, **kwargs) -> dict:
         return self.training_step(batch, *args, **kwargs)
 
-    def configure_optimizers(self):
+    # --- for optimisation --- #
+    def configure_optimizers(self) -> dict:
         optimizer = torch.optim.Adam(
-            params=self.parameters(), lr=self.hparams["lr"], betas=(0.9, 0.98), eps=1e-9
+            params=self.parameters(),
+            lr=self.hparams["lr"],
+            betas=self.hparams['betas'],
+            eps=self.hparams['eps'],
+            weight_decay=self.hparams['weight_decay']
         )
-        return optimizer
+        scheduler = ReduceLROnPlateau(
+            optimizer,
+            verbose=True,
+            mode=self.hparams['mode'],
+            patience=self.hparams['patience'],
+            cooldown=self.hparams['cooldown']
+        )
+        return {
+            "optimizer": optimizer,
+            "lr_scheduler": {
+                "scheduler": scheduler,
+                "monitor": self.hparams["monitor"]
+            }
+        }

@@ -1,19 +1,25 @@
 # --- config for training a transformer --- #
 transformer:
-  best: "transformer:overfit"
   hidden_size: 512
-  ffn_size: 512
-  heads: 32
-  depth: 3
-  max_length: 149
-  batch_size: 3
-  lr: 0.0001
-  dropout: 0.0
+  ffn_size: 2048
+  heads: 8
+  depth: 5
+  max_length: 150
+  lr: 0.1
+  dropout: 0.1
+  tokenizer: "tokenizer:v20"
+  # for dataloader
   seed: 410
   shuffle: true
-  tokenizer: "tokenizer:v20"
-  monitor: Validation/Loss_epoch
+  # for ADAM
+  eps: 0.000000001
+  betas: [0.9, 0.98]
+  weight_decay: 0.0005
+  # for ReduceOnPlateau
+  monitor: Train/Loss_epoch
   mode: min
+  patience: 10
+  cooldown: 1
 
 # --- config for building a tokenizer --- #
 tokenizer:
@@ -29,6 +35,8 @@ tokenizer:
   eos: "[EOS]"
   eos_id: 3
 
-# --- config for building a dataset --- #
-kor2eng:
-  # TODO: do this later, when you need preprocessing the dataset (e.g. upsampling)
+# --- config for recommended versions of artifacts --- #
+recommended:
+  transformer: "transformer:overfit"
+  tokenizer: "tokenizer:v20"
+  kor2eng: "kor2eng:v0"

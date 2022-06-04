@@ -18,8 +18,11 @@ os.environ["TOKENIZERS_PARALLELISM"] = "true"
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--num_workers", type=int, default=os.cpu_count())
-    parser.add_argument("--fast_dev_run", action="store_true", default=False)
+    required = parser.add_argument_group("required arguments")
+    required.add_argument("--batch_size", type=int, required=True)
+    optional = parser.add_argument_group("optional arguments")
+    optional.add_argument("--fast_dev_run", action="store_true", default=False)
+    optional.add_argument("--num_workers", type=int, default=os.cpu_count())
     args = parser.parse_args()
     config = fetch_config()["transformer"]
     config.update(vars(args))

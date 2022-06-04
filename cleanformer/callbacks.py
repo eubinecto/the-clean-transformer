@@ -129,7 +129,7 @@ class LogBLEUCallback(Callback):
             columns=["input", "prediction", "answer", "losses"],
             data=list(zip(inputs, predictions, answers, losses)),
         )
-        self.logger.log_metrics({"Train/BLEU": float(F.bleu_score(answers, predictions))})
+        self.logger.log_metrics({f"{key}/BLEU": float(F.bleu_score(answers, predictions))})
 
     def on_train_epoch_end(self, *args, **kwargs):
         self.on_any_epoch_end("Train")

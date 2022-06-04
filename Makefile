@@ -21,7 +21,7 @@ train_check:
 	--batch_size=3 \
     --save_on_train_epoch_end=1 \
     --every_n_epochs=1 \
-    --log_every_n_steps=10 \
+    --log_every_n_steps=3 \
     --check_val_every_n_epoch=1
 
 

@@ -14,12 +14,7 @@ train:
     --log_every_n_steps=2 \
     --check_val_every_n_epoch=1
 
-eval:
-	python3 main_eval.py \
-    --max_epochs=1
-
-# pseudo-tests
-test_train:
+train_check:
 	python3 main_train.py \
 	--fast_dev_run \
 	--max_epochs=60 \
@@ -29,5 +24,11 @@ test_train:
     --log_every_n_steps=2 \
     --check_val_every_n_epoch=1
 
-test_eval:
-	python3 main_eval.py --fast_dev_run
+
+test:
+	python3 main_test.py \
+    --max_epochs=1
+
+
+test_check:
+	python3 main_test.py --fast_dev_run

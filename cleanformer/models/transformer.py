@@ -120,8 +120,7 @@ class Transformer(LightningModule):  # lgtm [py/missing-call-to-init]
         src, tgt_r, tgt = batch
         losses, logits = self.step(src, tgt_r, tgt)
         return {
-            "loss": losses.sum(),  # (N, L) -> (1,)
-            # for logging purposes
+            "loss": losses.sum(),  # (N, L) -> (1)
             "losses": losses.detach(),  # (N, L)
             "logits": logits.detach(),  # (N, L)
         }
@@ -134,12 +133,7 @@ class Transformer(LightningModule):  # lgtm [py/missing-call-to-init]
 
     @torch.no_grad()
     def test_step(self, batch: Tuple[torch.Tensor, torch.Tensor, torch.Tensor], *args, **kwargs) -> dict:
-        src, tgt_r, _ = batch
-        tgt_hat = self.infer(src, tgt_r)  # ... ->  (N, L)
-        return {
-            # for logging purposes
-            "tgt_hat": tgt_hat
-        }
+        return self.training_step(batch, *args, **kwargs)
 
     def configure_optimizers(self):
         optimizer = torch.optim.Adam(

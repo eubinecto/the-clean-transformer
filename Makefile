@@ -30,10 +30,14 @@ train_check:
 
 test:
 	python3 main_test.py \
-    --max_epochs=1
+    --batch_size=64
 
 
 test_check:
 	python3 main_test.py \
 	--fast_dev_run \
     --batch_size=3
+
+
+streamlit:
+	streamlit run main_streamlit.py

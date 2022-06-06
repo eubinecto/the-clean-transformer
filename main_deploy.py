@@ -1,3 +1,3 @@
 """
-deploy cleanformer via streamlit
+Deploy a pre-trained transformer with fastapi.
 """

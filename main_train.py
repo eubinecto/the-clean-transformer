@@ -29,7 +29,6 @@ required.add_argument("--check_val_every_n_epoch", type=int, required=True)
 optional = parser.add_argument_group("optional arguments")
 optional.add_argument("--fast_dev_run", action="store_true", default=False)
 optional.add_argument("--detect_anomaly", action="store_true", default=False)
-optional.add_argument("--log_model", choices=(0, 1), type=int, default=1)  # could be int or str
 optional.add_argument("--verbose", choices=(0, 1), type=int, default=1)  # could be int or str
 optional.add_argument("--overfit_batches", type=int, default=0.0)
 optional.add_argument("--limit_train_batches", type=int, default=1.0)
@@ -74,7 +73,7 @@ transformer = Transformer(**config)
 # --- start wandb context --- #
 with wandb.init(project="cleanformer", config=config, tags=[__file__]):
     # --- prepare a wandb_logger (wandb) and a trainer to use --- #
-    wandb_logger = WandbLogger(log_model=config["log_model"],
+    wandb_logger = WandbLogger(log_model="all",
                                save_dir=WANDB_DIR)
     trainer = Trainer(
         fast_dev_run=config["fast_dev_run"],

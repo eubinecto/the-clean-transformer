@@ -13,7 +13,6 @@ train:
     --every_n_epochs=1 \
     --log_every_n_steps=2 \
     --check_val_every_n_epoch=1 \
-    --log_model=1
 
 train_check:
 	python3 main_train.py \
@@ -24,8 +23,7 @@ train_check:
     --save_on_train_epoch_end=1 \
     --every_n_epochs=1 \
     --log_every_n_steps=3 \
-    --check_val_every_n_epoch=1 \
-    --log_model=0
+    --check_val_every_n_epoch=1
 
 
 test:

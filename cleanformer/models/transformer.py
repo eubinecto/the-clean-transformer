@@ -1,4 +1,4 @@
-from typing import Tuple, List
+from typing import Tuple
 import torch  # noqa
 from pytorch_lightning import LightningModule
 from tokenizers import Tokenizer  # noqa
@@ -30,7 +30,6 @@ class Transformer(LightningModule):  # lgtm [py/missing-call-to-init]
         self.encoder = Encoder(hidden_size, ffn_size, max_length, heads, depth, dropout)  # the encoder stack
         self.decoder = Decoder(hidden_size, ffn_size, max_length, heads, depth, dropout)  # the decoder stack
         self.register_buffer("pos_encodings", cleanF.pos_encodings(max_length, hidden_size))  # (L, H)
-        self.cache = dict()  # for logging purposes
 
     def forward(
         self,
@@ -124,15 +123,11 @@ class Transformer(LightningModule):  # lgtm [py/missing-call-to-init]
     def training_step(self, batch: Tuple[torch.Tensor, torch.Tensor, torch.Tensor], *args, **kwargs) -> dict:
         src, tgt_r, tgt_ids = batch
         losses, logits = self.step(src, tgt_r, tgt_ids)
-        tgt_hat_ids = self.infer(src, tgt_r)
         return {
             "loss": losses.sum(),  # (N, L) -> (1)
             # --- for logging purposes --- #
-            "losses": losses.sum(dim=1).detach().cpu(),  # (N, L) -> (N,)
-            "logits": logits.detach().cpu(),   # (N, |V|, L)
-            "src_ids": src[:, 0].cpu(),  # (N, L)
-            "tgt_ids": tgt_ids.cpu(),  # (N, L)
-            "tgt_hat_ids": tgt_hat_ids.cpu()  # (N, L)
+            "losses": losses.sum(dim=1).detach(),  # (N, L) -> (N,)
+            "logits": logits.detach()   # (N, |V|, L)
         }
 
     @torch.no_grad()
@@ -144,15 +139,6 @@ class Transformer(LightningModule):  # lgtm [py/missing-call-to-init]
     @torch.no_grad()
     def test_step(self, batch: Tuple[torch.Tensor, torch.Tensor, torch.Tensor], *args, **kwargs) -> dict:
         return self.training_step(batch, *args, **kwargs)
-
-    def training_epoch_end(self, outputs: List[dict], *args, **kwargs) -> None:
-        self.cache["train"] = outputs
-
-    def validation_epoch_end(self, outputs: List[dict], *args, **kwargs) -> None:
-        self.cache["validation"] = outputs
-
-    def test_epoch_end(self, outputs: List[dict], *args, **kwargs) -> None:
-        self.cache['test'] = outputs
 
     # --- for optimisation --- #
     def configure_optimizers(self) -> dict:

@@ -26,7 +26,7 @@ class LogCallback(Callback):
 
     def on_any_batch_end(self, key: str, transformer: Transformer,
                          src: torch.Tensor, tgt_r: torch.Tensor, tgt_ids: torch.Tensor, losses: List[float]) -> tuple:
-        inputs = self.tokenizer.decode_batch(src.cpu().tolist())
+        inputs = self.tokenizer.decode_batch(src[:, 0].cpu().tolist())
         answers = self.tokenizer.decode_batch(tgt_ids.cpu().tolist())
         predictions = self.tokenizer.decode_batch(transformer.infer(src, tgt_r).cpu().tolist())
         self.cache[key]["inputs"] = self.cache[key].get("inputs", list()) + inputs

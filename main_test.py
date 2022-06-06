@@ -9,7 +9,7 @@ import wandb
 from pytorch_lightning import Trainer
 from pytorch_lightning.loggers import WandbLogger
 from torch.utils.data import DataLoader, TensorDataset  # noqa
-from cleanformer.logger import LogCallback
+from cleanformer.logcallback import LogCallback
 from cleanformer.fetchers import fetch_kor2eng, fetch_config, fetch_tokenizer, fetch_transformer
 from cleanformer import preprocess as P  # noqa
 

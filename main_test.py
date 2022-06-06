@@ -9,7 +9,7 @@ import wandb
 from pytorch_lightning import Trainer
 from pytorch_lightning.loggers import WandbLogger
 from torch.utils.data import DataLoader, TensorDataset  # noqa
-from cleanformer.logger import Logger
+from cleanformer.logger import LogCallback
 from cleanformer.fetchers import fetch_kor2eng, fetch_config, fetch_tokenizer, fetch_transformer
 from cleanformer import preprocess as P  # noqa
 
@@ -48,7 +48,7 @@ with wandb.init(project="cleanformer", config=config, tags=[__file__]):
         fast_dev_run=config["fast_dev_run"],
         gpus=torch.cuda.device_count(),
         logger=logger,
-        callbacks=[Logger(tokenizer)],
+        callbacks=[LogCallback(tokenizer)],
     )
     # start testing here
     trainer.test(model=transformer, dataloaders=test_dataloader)

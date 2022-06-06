@@ -9,7 +9,7 @@ from pytorch_lightning.loggers import WandbLogger
 from torch.utils.data import DataLoader, TensorDataset  # noqa
 from cleanformer import preprocess as P  # noqa
 from cleanformer.fetchers import fetch_tokenizer, fetch_config, fetch_kor2eng
-from cleanformer.logger import Logger
+from cleanformer.logger import LogCallback
 from cleanformer.models.transformer import Transformer
 from cleanformer.paths import WANDB_DIR
 
@@ -94,7 +94,7 @@ with wandb.init(project="cleanformer", config=config, tags=[__file__]):
                 save_on_train_epoch_end=config["save_on_train_epoch_end"],
             ),
             LearningRateMonitor(logging_interval="epoch"),
-            Logger(tokenizer)
+            LogCallback(tokenizer)
         ],
     )
     # --- start training --- #

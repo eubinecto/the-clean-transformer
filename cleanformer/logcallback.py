@@ -7,7 +7,7 @@ from torchmetrics import functional as metricsF  # noqa
 from cleanformer.models.transformer import Transformer
 
 
-class Logger(Callback):
+class LogCallback(Callback):
     """
     For logging loss, perplexity, accuracy, BLEU along with qualitative results.
     """
@@ -42,6 +42,7 @@ class Logger(Callback):
         transformer: Transformer,
         out: dict,
         batch: Tuple[torch.Tensor, torch.Tensor, torch.Tensor],
+        *args,
         **kwargs
     ) -> None:
         src, tgt_r, tgt_ids = batch
@@ -59,6 +60,7 @@ class Logger(Callback):
         transformer: Transformer,
         out: dict,
         batch: Tuple[torch.Tensor, torch.Tensor, torch.Tensor],
+        *args,
         **kwargs
     ) -> None:
         # logging validation metrics for each batch is unnecessary
@@ -77,6 +79,7 @@ class Logger(Callback):
             transformer: Transformer,
             out: dict,
             batch: Tuple[torch.Tensor, torch.Tensor, torch.Tensor],
+            *args,
             **kwargs
     ) -> None:
         src, tgt_r, tgt_ids = batch

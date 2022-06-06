@@ -1,4 +1,4 @@
-from typing import Tuple
+from typing import Tuple, List
 import torch  # noqa
 from pytorch_lightning import LightningModule
 from tokenizers import Tokenizer  # noqa
@@ -30,6 +30,7 @@ class Transformer(LightningModule):  # lgtm [py/missing-call-to-init]
         self.encoder = Encoder(hidden_size, ffn_size, max_length, heads, depth, dropout)  # the encoder stack
         self.decoder = Decoder(hidden_size, ffn_size, max_length, heads, depth, dropout)  # the decoder stack
         self.register_buffer("pos_encodings", cleanF.pos_encodings(max_length, hidden_size))  # (L, H)
+        self.cache = dict()  # for logging purposes
 
     def forward(
         self,
@@ -46,20 +47,20 @@ class Transformer(LightningModule):  # lgtm [py/missing-call-to-init]
         :return hidden (N, L, H)
         """
         # --- lookup embedding vectors --- #
-        src = self.token_embeddings(src_ids)  # (N, L) -> (N, L, H)
-        tgt_r = self.token_embeddings(tgt_r_ids)  # (N, L) -> (N, L, H)
+        src_embeddings = self.token_embeddings(src_ids)  # (N, L) -> (N, L, H)
+        tgt_r_embeddings = self.token_embeddings(tgt_r_ids)  # (N, L) -> (N, L, H)
         # --- encode positions (the positions are broadcast-added to N) --- #
-        src += self.pos_encodings  # (N, L, H) + (L, H) -> (N, L, H)
-        tgt_r += self.pos_encodings  # (N, L, H) + (L, H) -> (N, L, H)
+        src_embeddings += self.pos_encodings  # (N, L, H) + (L, H) -> (N, L, H)
+        tgt_r_embeddings += self.pos_encodings  # (N, L, H) + (L, H) -> (N, L, H)
         # --- encode & decode --- #
-        memory = self.encoder.forward(src, src_key_padding_mask)  # ... -> (N, L, H)
+        memory = self.encoder.forward(src_embeddings, src_key_padding_mask)  # ... -> (N, L, H)
         hidden = self.decoder.forward(
-            tgt_r, memory, tgt_r_key_padding_mask, src_key_padding_mask
+            tgt_r_embeddings, memory, tgt_r_key_padding_mask, src_key_padding_mask
         )  # ... (N, L, H)
         return hidden
 
     def step(
-        self, src: torch.Tensor, tgt_r: torch.Tensor, tgt: torch.Tensor
+        self, src: torch.Tensor, tgt_r: torch.Tensor, tgt_ids: torch.Tensor
     ) -> Tuple[torch.Tensor, torch.Tensor]:
         """
         An implementation of autoregressive training
@@ -79,12 +80,13 @@ class Transformer(LightningModule):  # lgtm [py/missing-call-to-init]
         logits = torch.einsum("...lh,vh->...vl", hidden, cls)  # (N, |V|, L)
         losses = torchF.cross_entropy(
             logits,
-            tgt,
+            tgt_ids,
             ignore_index=self.hparams["pad_token_id"],
             reduction="none",  # so that we can explore batches by loss
         )  # (N, |V|, L), (N, L) -> (N, L)
         return losses, logits
 
+    @torch.no_grad()
     def infer(self, src: torch.Tensor, tgt_r: torch.Tensor) -> torch.Tensor:
         """
         An implementation of autoregressive inference
@@ -94,8 +96,9 @@ class Transformer(LightningModule):  # lgtm [py/missing-call-to-init]
             src[:, 1],
         )  # (N, 2, L) -> (N, L), (N, L)
         tgt_r_ids, tgt_r_key_padding_mask = (
-            tgt_r[:, 0],
-            tgt_r[:, 1],
+            # clone, to prevent possible issues due to in-place operations
+            tgt_r[:, 0].clone(),
+            tgt_r[:, 1].clone(),
         )  # (N, 2, L) -> (N, L), (N, L)
         for t in range(self.hparams["max_length"] - 1):
             hidden = self.forward(
@@ -119,12 +122,17 @@ class Transformer(LightningModule):  # lgtm [py/missing-call-to-init]
                 torch.nn.init.xavier_uniform_(param)
 
     def training_step(self, batch: Tuple[torch.Tensor, torch.Tensor, torch.Tensor], *args, **kwargs) -> dict:
-        src, tgt_r, tgt = batch
-        losses, logits = self.step(src, tgt_r, tgt)
+        src, tgt_r, tgt_ids = batch
+        losses, logits = self.step(src, tgt_r, tgt_ids)
+        tgt_hat_ids = self.infer(src, tgt_r)
         return {
             "loss": losses.sum(),  # (N, L) -> (1)
-            "losses": losses.detach(),  # (N, L)
-            "logits": logits.detach(),  # (N, L)
+            # --- for logging purposes --- #
+            "losses": losses.sum(dim=1).detach().cpu(),  # (N, L) -> (N,)
+            "logits": logits.detach().cpu(),   # (N, |V|, L)
+            "src_ids": src[:, 0].cpu(),  # (N, L)
+            "tgt_ids": tgt_ids.cpu(),  # (N, L)
+            "tgt_hat_ids": tgt_hat_ids.cpu()  # (N, L)
         }
 
     @torch.no_grad()
@@ -136,6 +144,15 @@ class Transformer(LightningModule):  # lgtm [py/missing-call-to-init]
     @torch.no_grad()
     def test_step(self, batch: Tuple[torch.Tensor, torch.Tensor, torch.Tensor], *args, **kwargs) -> dict:
         return self.training_step(batch, *args, **kwargs)
+
+    def training_epoch_end(self, outputs: List[dict], *args, **kwargs) -> None:
+        self.cache["train"] = outputs
+
+    def validation_epoch_end(self, outputs: List[dict], *args, **kwargs) -> None:
+        self.cache["validation"] = outputs
+
+    def test_epoch_end(self, outputs: List[dict], *args, **kwargs) -> None:
+        self.cache['test'] = outputs
 
     # --- for optimisation --- #
     def configure_optimizers(self) -> dict:

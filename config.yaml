@@ -16,7 +16,7 @@ transformer:
   betas: [0.9, 0.98]
   weight_decay: 0.0005
   # for ReduceOnPlateau
-  monitor: Train/Loss_epoch
+  monitor: train/loss_epoch
   mode: min
   patience: 10
   cooldown: 1
@@ -37,6 +37,6 @@ tokenizer:
 
 # --- config for recommended versions of artifacts --- #
 recommended:
-  transformer: "transformer:overfit"
+  transformer: "model-xb8gtf6k:v25"
   tokenizer: "tokenizer:v20"
   kor2eng: "kor2eng:v0"

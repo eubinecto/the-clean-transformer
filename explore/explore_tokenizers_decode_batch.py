@@ -14,9 +14,9 @@ def main():
     tokenizer = fetch_tokenizer(config["tokenizer"])
     transformer = fetch_transformer(config["ver"])
     test = TensorDataset(
-        P.src(tokenizer, config["max_length"], kor2eng[2]),
-        P.tgt_r(tokenizer, config["max_length"], kor2eng[2]),
-        P.tgt(tokenizer, config["max_length"], kor2eng[2]),
+        P.to_src(tokenizer, config["max_length"], kor2eng[2]),
+        P.to_tgt_r(tokenizer, config["max_length"], kor2eng[2]),
+        P.to_tgt_ids(tokenizer, config["max_length"], kor2eng[2]),
     )
     test_dataloader = DataLoader(
         test,

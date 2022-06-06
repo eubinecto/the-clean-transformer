@@ -4,12 +4,12 @@ import shutil
 import torch  # noqa
 import wandb
 from pytorch_lightning import Trainer
-from pytorch_lightning.callbacks import LearningRateMonitor, ModelCheckpoint
+from pytorch_lightning.callbacks import LearningRateMonitor, ModelCheckpoint, ModelSummary
 from pytorch_lightning.loggers import WandbLogger
 from torch.utils.data import DataLoader, TensorDataset  # noqa
 from cleanformer import preprocess as P  # noqa
-from cleanformer.callbacks import LogMetricsCallback, LogBLEUCallback
 from cleanformer.fetchers import fetch_tokenizer, fetch_config, fetch_kor2eng
+from cleanformer.logger import Logger
 from cleanformer.models.transformer import Transformer
 from cleanformer.paths import WANDB_DIR
 
@@ -23,15 +23,19 @@ def main():
     required = parser.add_argument_group("required arguments")
     required.add_argument("--max_epochs", type=int, required=True)
     required.add_argument("--batch_size", type=int, required=True)
-    required.add_argument("--save_on_train_epoch_end", type=int, required=True)
+    required.add_argument("--save_on_train_epoch_end", choices=(0, 1), type=int, required=True)
     required.add_argument("--every_n_epochs", type=int, required=True)
     required.add_argument("--log_every_n_steps", type=int, required=True)
     required.add_argument("--check_val_every_n_epoch", type=int, required=True)
     optional = parser.add_argument_group("optional arguments")
     optional.add_argument("--fast_dev_run", action="store_true", default=False)
+    optional.add_argument("--detect_anomaly", action="store_true", default=False)
+    optional.add_argument("--log_model", choices=(0, 1), type=int, default=1)  # could be int or str
+    optional.add_argument("--verbose", choices=(0, 1), type=int, default=1)  # could be int or str
     optional.add_argument("--overfit_batches", type=int, default=0.0)
     optional.add_argument("--limit_train_batches", type=int, default=1.0)
     optional.add_argument("--limit_val_batches", type=int, default=1.0)
+    optional.add_argument("--max_depth", type=int, default=4)
     optional.add_argument("--num_workers", type=int, default=os.cpu_count())
     args = parser.parse_args()
     config = fetch_config()["transformer"]
@@ -41,14 +45,14 @@ def main():
     # --- prepare the dataloaders --- #
     train, val, _ = fetch_kor2eng(tokenizer.kor2eng)  # noqa
     train = TensorDataset(
-        P.src(tokenizer, config["max_length"], train),
-        P.tgt_r(tokenizer, config["max_length"], train),
-        P.tgt(tokenizer, config["max_length"], train),
+        P.to_src(tokenizer, config["max_length"], train),
+        P.to_tgt_r(tokenizer, config["max_length"], train),
+        P.to_tgt_ids(tokenizer, config["max_length"], train),
     )
     val = TensorDataset(
-        P.src(tokenizer, config["max_length"], val),
-        P.tgt_r(tokenizer, config["max_length"], val),
-        P.tgt(tokenizer, config["max_length"], val),
+        P.to_src(tokenizer, config["max_length"], val),
+        P.to_tgt_r(tokenizer, config["max_length"], val),
+        P.to_tgt_ids(tokenizer, config["max_length"], val),
     )
     train_dataloader = DataLoader(
         train,
@@ -70,11 +74,12 @@ def main():
     transformer = Transformer(**config)
     # --- start wandb context --- #
     with wandb.init(project="cleanformer", config=config, tags=[__file__]):
-        # --- prepare a logger (wandb) and a trainer to use --- #
-        logger = WandbLogger(log_model="all", save_dir=WANDB_DIR)
+        # --- prepare a wandb_logger (wandb) and a trainer to use --- #
+        wandb_logger = WandbLogger(log_model=config["log_model"],
+                                   save_dir=WANDB_DIR)
         trainer = Trainer(
-            logger=logger,
             fast_dev_run=config["fast_dev_run"],
+            detect_anomaly=config['detect_anomaly'],
             limit_train_batches=config["limit_train_batches"],
             limit_val_batches=config["limit_val_batches"],
             check_val_every_n_epoch=config["check_val_every_n_epoch"],
@@ -82,15 +87,16 @@ def main():
             log_every_n_steps=config["log_every_n_steps"],
             max_epochs=config["max_epochs"],
             gpus=torch.cuda.device_count(),
+            logger=wandb_logger,
             callbacks=[
+                ModelSummary(max_depth=config['max_depth']),
                 ModelCheckpoint(
-                    verbose=True,
+                    verbose=config['verbose'],
                     every_n_epochs=config["every_n_epochs"],
                     save_on_train_epoch_end=config["save_on_train_epoch_end"],
                 ),
                 LearningRateMonitor(logging_interval="epoch"),
-                LogMetricsCallback(),
-                LogBLEUCallback(logger, tokenizer),
+                Logger(tokenizer)
             ],
         )
         # --- start training --- #

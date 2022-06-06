@@ -9,7 +9,7 @@ import wandb
 from pytorch_lightning import Trainer
 from pytorch_lightning.loggers import WandbLogger
 from torch.utils.data import DataLoader, TensorDataset  # noqa
-from cleanformer.callbacks import LogBLEUCallback
+from cleanformer.logger import Logger
 from cleanformer.fetchers import fetch_kor2eng, fetch_config, fetch_tokenizer, fetch_transformer
 from cleanformer import preprocess as P  # noqa
 
@@ -24,15 +24,15 @@ def main():
     optional.add_argument("--fast_dev_run", action="store_true", default=False)
     optional.add_argument("--num_workers", type=int, default=os.cpu_count())
     args = parser.parse_args()
-    config = fetch_config()["transformer"]
+    config = fetch_config()["recommended"]
     config.update(vars(args))
-    transformer = fetch_transformer(config["best"])
+    transformer = fetch_transformer(config["transformer"])
     tokenizer = fetch_tokenizer(config["tokenizer"])
-    kor2eng = fetch_kor2eng(tokenizer.kor2eng)  # noqa
+    _, _, test = fetch_kor2eng(tokenizer.kor2eng)  # noqa
     test = TensorDataset(
-        P.src(tokenizer, config["max_length"], kor2eng[2]),
-        P.tgt_r(tokenizer, config["max_length"], kor2eng[2]),
-        P.tgt(tokenizer, config["max_length"], kor2eng[2]),
+        P.to_src(tokenizer, transformer.hparams['max_length'], test),
+        P.to_tgt_r(tokenizer, transformer.hparams['max_length'], test),
+        P.to_tgt_ids(tokenizer, transformer.hparams['max_length'], test),
     )
     test_dataloader = DataLoader(
         test,
@@ -49,7 +49,7 @@ def main():
             fast_dev_run=config["fast_dev_run"],
             gpus=torch.cuda.device_count(),
             logger=logger,
-            callbacks=[LogBLEUCallback(logger, tokenizer)],
+            callbacks=[Logger(tokenizer)],
         )
         # start testing here
         trainer.test(model=transformer, dataloaders=test_dataloader)

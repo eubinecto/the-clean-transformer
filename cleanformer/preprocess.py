@@ -21,7 +21,7 @@ def encode(tokenizer: Tokenizer, max_length: int, sents: List[str]) -> Tuple[tor
     return ids, key_padding_mask
 
 
-def src(tokenizer: Tokenizer, max_length: int, x2y: List[Tuple[str, str]]) -> torch.Tensor:
+def to_src(tokenizer: Tokenizer, max_length: int, x2y: List[Tuple[str, str]]) -> torch.Tensor:
     """
     returns: src (N, 2, L)
     """
@@ -41,7 +41,7 @@ def src(tokenizer: Tokenizer, max_length: int, x2y: List[Tuple[str, str]]) -> to
     return torch.stack([src_ids, src_key_padding_mask], dim=1).long()  # (N, 2, L)
 
 
-def tgt_r(tokenizer: Tokenizer, max_length: int, x2y: List[Tuple[str, str]]) -> torch.Tensor:
+def to_tgt_r(tokenizer: Tokenizer, max_length: int, x2y: List[Tuple[str, str]]) -> torch.Tensor:
     """
     return: tgt_r (N, 2, L)
     """
@@ -59,7 +59,7 @@ def tgt_r(tokenizer: Tokenizer, max_length: int, x2y: List[Tuple[str, str]]) -> 
     return torch.stack([tgt_r_ids, tgt_r_key_padding_mask], dim=1).long()  # (N, 2, L)
 
 
-def tgt(tokenizer: Tokenizer, max_length: int, x2y: List[Tuple[str, str]]) -> torch.Tensor:
+def to_tgt_ids(tokenizer: Tokenizer, max_length: int, x2y: List[Tuple[str, str]]) -> torch.Tensor:
     sents = [y for _, y in x2y]
     tgt_ids, _ = encode(
         tokenizer,

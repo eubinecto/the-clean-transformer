@@ -81,7 +81,7 @@ class Transformer(LightningModule):  # lgtm [py/missing-call-to-init]
             logits,
             tgt_ids,
             ignore_index=self.hparams["pad_token_id"],
-            reduction="none",  # so that we can explore batches by loss
+            reduction="none",  # so that we can explore each instance by loss
         )  # (N, |V|, L), (N, L) -> (N, L)
         return losses, logits
 
@@ -124,9 +124,9 @@ class Transformer(LightningModule):  # lgtm [py/missing-call-to-init]
         src, tgt_r, tgt_ids = batch
         losses, logits = self.step(src, tgt_r, tgt_ids)
         return {
-            "loss": losses.sum(),  # (N, L) -> (1)
+            "loss": losses.mean(dim=-1).mean(dim=-1),  # (N, L) -> (N,)  -> (1,)
             # --- for logging purposes --- #
-            "losses": losses.sum(dim=1).detach(),  # (N, L) -> (N,)
+            "losses": losses.mean(dim=-1).detach(),  # (N, L) -> (N,)
             "logits": logits.detach()   # (N, |V|, L)
         }
 

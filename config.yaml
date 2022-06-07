@@ -5,7 +5,7 @@ transformer:
   heads: 8
   depth: 5
   max_length: 150
-  lr: 0.00001
+  lr: 0.01
   dropout: 0.1
   tokenizer: "tokenizer:v20"
   # for dataloader
@@ -18,7 +18,7 @@ transformer:
   # for ReduceOnPlateau
   monitor: train/loss_epoch
   mode: min
-  patience: 10
+  patience: 3
   cooldown: 1
 
 # --- config for building a tokenizer --- #

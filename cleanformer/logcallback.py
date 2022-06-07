@@ -15,13 +15,15 @@ class LogCallback(Callback):
         self.tokenizer = tokenizer
         self.cache = {"train": dict(), "validation": dict(), "test": dict()}
 
-    def on_train_start(self, *args, **kwargs) -> None:
         self.cache["train"].clear()
 
-    def on_validation_start(self, *args, **kwargs) -> None:
+    def on_train_epoch_start(self, *args, **kwargs) -> None:
+        self.cache["train"].clear()
+
+    def on_validation_epoch_start(self, *args, **kwargs) -> None:
         self.cache["validation"].clear()
 
-    def on_test_start(self, *args, **kwargs) -> None:
+    def on_test_epoch_start(self, *args, **kwargs) -> None:
         self.cache["test"].clear()
 
     def on_any_batch_end(self, key: str, transformer: Transformer,

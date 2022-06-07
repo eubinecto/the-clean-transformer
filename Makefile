@@ -16,7 +16,7 @@ train:
 
 train_overfit:
 	python3 main_train.py \
-	--max_epochs=300 \
+	--max_epochs=1000 \
     --overfit_batches=3 \
 	--batch_size=64 \
     --save_on_train_epoch_end=1 \

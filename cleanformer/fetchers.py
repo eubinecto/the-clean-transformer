@@ -34,7 +34,7 @@ def fetch_tokenizer(name: str) -> Tokenizer:
     tokenizer.bos_token_id = artifact.metadata["bos_id"]
     tokenizer.eos_token = artifact.metadata["eos"]
     tokenizer.eos_token_id = artifact.metadata["eos_id"]
-    tokenizer.kor2eng = artifact.metadata['kor2eng']
+    tokenizer.kor2eng = artifact.metadata["kor2eng"]
     return tokenizer
 
 

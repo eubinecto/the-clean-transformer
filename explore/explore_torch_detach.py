@@ -1,4 +1,3 @@
-
 import torch
 
 
@@ -19,5 +18,5 @@ def main():
     print(z.grad_fn.next_functions)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()

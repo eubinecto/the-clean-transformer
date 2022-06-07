@@ -65,19 +65,15 @@ val_dataloader = DataLoader(
     num_workers=config["num_workers"],
 )
 # --- instantiate the transformer to train --- #
-config.update({
-    "vocab_size": tokenizer.get_vocab_size(),
-    "pad_token_id": tokenizer.pad_token_id  # noqa
-})
+config.update({"vocab_size": tokenizer.get_vocab_size(), "pad_token_id": tokenizer.pad_token_id})  # noqa
 transformer = Transformer(**config)
 # --- start wandb context --- #
 with wandb.init(project="cleanformer", config=config, tags=[__file__]):
     # --- prepare a wandb_logger (wandb) and a trainer to use --- #
-    wandb_logger = WandbLogger(log_model="all",
-                               save_dir=WANDB_DIR)
+    wandb_logger = WandbLogger(log_model="all", save_dir=WANDB_DIR)
     trainer = Trainer(
         fast_dev_run=config["fast_dev_run"],
-        detect_anomaly=config['detect_anomaly'],
+        detect_anomaly=config["detect_anomaly"],
         limit_train_batches=config["limit_train_batches"],
         limit_val_batches=config["limit_val_batches"],
         check_val_every_n_epoch=config["check_val_every_n_epoch"],
@@ -87,14 +83,14 @@ with wandb.init(project="cleanformer", config=config, tags=[__file__]):
         gpus=torch.cuda.device_count(),
         logger=wandb_logger,
         callbacks=[
-            ModelSummary(max_depth=config['max_depth']),
+            ModelSummary(max_depth=config["max_depth"]),
             ModelCheckpoint(
-                verbose=config['verbose'],
+                verbose=config["verbose"],
                 every_n_epochs=config["every_n_epochs"],
                 save_on_train_epoch_end=config["save_on_train_epoch_end"],
             ),
             LearningRateMonitor(logging_interval="epoch"),
-            LogCallback(tokenizer)
+            LogCallback(tokenizer),
         ],
     )
     # --- start training --- #
@@ -105,4 +101,3 @@ with wandb.init(project="cleanformer", config=config, tags=[__file__]):
     )
 # sweep local logs after uploading is done
 shutil.rmtree(WANDB_DIR)
-

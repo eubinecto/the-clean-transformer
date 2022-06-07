@@ -30,15 +30,15 @@ trainer = WordPieceTrainer(vocab_size=config["vocab_size"], special_tokens=speci
 tokenizer.pre_tokenizer = pre_tokenizers.Sequence([Whitespace(), Digits(), Punctuation()])  # noqa
 tokenizer.normalizer = normalizers.Sequence([Lowercase()])  # noqa
 # --- prepare the data --- #
-kor2eng_train, kor2eng_val, kor2eng_test = fetch_kor2eng(config['kor2eng'])
+train, val, test = fetch_kor2eng(config["kor2eng"])
 # chaining two generators;  https://stackoverflow.com/a/3211047
 iterator = chain(
-    (kor for kor, _ in kor2eng_train),
-    (eng for _, eng in kor2eng_train),
-    (kor for kor, _ in kor2eng_val),
-    (eng for _, eng in kor2eng_val),
-    (kor for kor, _ in kor2eng_test),
-    (eng for _, eng in kor2eng_test),
+    (kor for kor, _ in train),
+    (eng for _, eng in train),
+    (kor for kor, _ in val),
+    (eng for _, eng in val),
+    (kor for kor, _ in test),
+    (eng for _, eng in test),
 )
 # --- train the tokenizer --- #
 tokenizer.train_from_iterator(iterator, trainer=trainer)

@@ -29,9 +29,9 @@ transformer = fetch_transformer(config["transformer"])
 tokenizer = fetch_tokenizer(config["tokenizer"])
 _, _, test = fetch_kor2eng(tokenizer.kor2eng)  # noqa
 test = TensorDataset(
-    P.to_src(tokenizer, transformer.hparams['max_length'], test),
-    P.to_tgt_r(tokenizer, transformer.hparams['max_length'], test),
-    P.to_tgt_ids(tokenizer, transformer.hparams['max_length'], test),
+    P.to_src(tokenizer, transformer.hparams["max_length"], test),
+    P.to_tgt_r(tokenizer, transformer.hparams["max_length"], test),
+    P.to_tgt_ids(tokenizer, transformer.hparams["max_length"], test),
 )
 test_dataloader = DataLoader(
     test,
@@ -53,5 +53,3 @@ with wandb.init(project="cleanformer", config=config, tags=[__file__]):
     # start testing here
     trainer.test(model=transformer, dataloaders=test_dataloader)
 shutil.rmtree("wandb")
-
-

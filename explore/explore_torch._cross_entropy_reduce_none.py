@@ -1,15 +1,9 @@
-
-
 import torch
 from torch.nn import functional as F
 
-labels = torch.Tensor([[1, 2, 3],
-                       [2, 1, 3],
-                       [3, 2, 1]])
+labels = torch.Tensor([[1, 2, 3], [2, 1, 3], [3, 2, 1]])
 
-predictions = torch.Tensor([[10, 20, 30],
-                            [10, 20, 30],
-                            [10, 20, 30]])
+predictions = torch.Tensor([[10, 20, 30], [10, 20, 30], [10, 20, 30]])
 
 # this is not just a sum of each batch. The default reduce value is mean.
 print(F.cross_entropy(predictions, target=labels))  # (3, 3), (3, 3) -> (1,)

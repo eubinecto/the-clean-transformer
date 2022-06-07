@@ -127,7 +127,7 @@ class Transformer(LightningModule):  # lgtm [py/missing-call-to-init]
             "loss": losses.mean(dim=-1).mean(dim=-1),  # (N, L) -> (N,)  -> (1,)
             # --- for logging purposes --- #
             "losses": losses.mean(dim=-1).detach(),  # (N, L) -> (N,)
-            "logits": logits.detach()   # (N, |V|, L)
+            "logits": logits.detach(),  # (N, |V|, L)
         }
 
     @torch.no_grad()
@@ -145,21 +145,19 @@ class Transformer(LightningModule):  # lgtm [py/missing-call-to-init]
         optimizer = torch.optim.Adam(
             params=self.parameters(),
             lr=self.hparams["lr"],
-            betas=self.hparams['betas'],
-            eps=self.hparams['eps'],
-            weight_decay=self.hparams['weight_decay']
+            betas=self.hparams["betas"],
+            eps=self.hparams["eps"],
+            weight_decay=self.hparams["weight_decay"],
         )
         scheduler = ReduceLROnPlateau(
             optimizer,
             verbose=True,
-            mode=self.hparams['mode'],
-            patience=self.hparams['patience'],
-            cooldown=self.hparams['cooldown']
+            mode=self.hparams["mode"],
+            patience=self.hparams["patience"],
+            cooldown=self.hparams["cooldown"],
+            threshold=self.hparams['threshold']
         )
         return {
             "optimizer": optimizer,
-            "lr_scheduler": {
-                "scheduler": scheduler,
-                "monitor": self.hparams["monitor"]
-            }
+            "lr_scheduler": {"scheduler": scheduler, "monitor": self.hparams["monitor"]},
         }

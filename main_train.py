@@ -30,11 +30,11 @@ optional = parser.add_argument_group("optional arguments")
 optional.add_argument("--fast_dev_run", action="store_true", default=False)
 optional.add_argument("--detect_anomaly", action="store_true", default=False)
 optional.add_argument("--verbose", choices=(0, 1), type=int, default=1)  # could be int or str
+optional.add_argument("--save_last", choices=(0, 1), type=int, default=1)  # could be int or str
 optional.add_argument("--overfit_batches", type=int, default=0.0)
 optional.add_argument("--limit_train_batches", type=int, default=1.0)
 optional.add_argument("--limit_val_batches", type=int, default=1.0)
 optional.add_argument("--max_depth", type=int, default=4)
-optional.add_argument("--save_top_k", type=int, default=1)
 optional.add_argument("--num_workers", type=int, default=os.cpu_count())
 args = parser.parse_args()
 config = fetch_config()["transformer"]
@@ -70,7 +70,7 @@ config.update(
     {
         "vocab_size": tokenizer.get_vocab_size(),
         "pad_token_id": tokenizer.pad_token_id,  # noqa
-        "eos_token_id": tokenizer.eos_token_id,
+        "eos_token_id": tokenizer.eos_token_id,  # noqa
     }
 )  # noqa
 transformer = Transformer(**config)
@@ -93,11 +93,9 @@ with wandb.init(project="cleanformer", config=config, tags=[__file__]):
             ModelSummary(max_depth=config["max_depth"]),
             ModelCheckpoint(
                 verbose=config["verbose"],
-                save_top_k=config["save_top_k"],
-                mode=config["mode"],
-                monitor=config["monitor"],
                 every_n_epochs=config["every_n_epochs"],
                 save_on_train_epoch_end=config["save_on_train_epoch_end"],
+                save_last=config['save_last'],
             ),
             LearningRateMonitor(logging_interval="epoch"),
             LogCallback(tokenizer),

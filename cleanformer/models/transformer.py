@@ -101,9 +101,9 @@ class Transformer(LightningModule):  # lgtm [py/missing-call-to-init]
                 src_ids, tgt_r_ids, src_key_padding_mask, tgt_r_key_padding_mask
             )  # ... -> (N, L, H)
             cls = self.token_embeddings.weight  # (|V|, H)
-            logits = torch.einsum("...lh,vh->...lv", hidden, cls)  # (N, L, H) * (|V|, H) -> (N, L, |V|)
-            probs = torch.softmax(logits, dim=-1)  # (N, L, |V|) -> (N, L, |V|)
-            tgt_ids = torch.argmax(probs, dim=-1)  # (N, L, |V|) -> (N, L)
+            logits = torch.einsum("...lh,vh->...vl", hidden, cls)  # (N, L, H) * (|V|, H) -> (N, L, |V|)
+            probs = torch.softmax(logits, dim=1)  # (N, |V|, L) -> (N, |V|, L)
+            tgt_ids = torch.argmax(probs, dim=1)  # (N, |V|, L) -> (N, L)
             tgt_r_ids[:, t] = torch.where(  # noqa
                 tgt_r_ids[:, t - 1] == self.hparams["eos_token_id"],
                 self.hparams["eos_token_id"],

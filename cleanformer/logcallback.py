@@ -1,9 +1,11 @@
-from typing import Tuple, List
+from typing import Tuple
 import torch  # noqa
 import wandb
 from pytorch_lightning import Callback, Trainer
 from tokenizers import Tokenizer  # noqa
+from torch.utils.data import DataLoader  # noqa
 from torchmetrics import functional as metricsF  # noqa
+from torch.nn import functional as torchF  # noqa
 from cleanformer.models.transformer import Transformer
 
 
@@ -14,39 +16,6 @@ class LogCallback(Callback):
 
     def __init__(self, tokenizer: Tokenizer):
         self.tokenizer = tokenizer
-        self.cache = {"train": dict(), "validation": dict(), "test": dict()}
-
-        self.cache["train"].clear()
-
-    def on_train_epoch_start(self, *args, **kwargs) -> None:
-        self.cache["train"].clear()
-
-    def on_validation_epoch_start(self, *args, **kwargs) -> None:
-        self.cache["validation"].clear()
-
-    def on_test_epoch_start(self, *args, **kwargs) -> None:
-        self.cache["test"].clear()
-
-    def on_any_batch_end(
-        self,
-        key: str,
-        transformer: Transformer,
-        src: torch.Tensor,
-        tgt_r: torch.Tensor,
-        tgt_ids: torch.Tensor,
-        losses: List[float],
-    ) -> Tuple[List[List[List[str]]], List[List[str]]]:
-        inputs = self.tokenizer.decode_batch(src[:, 0].cpu().tolist())
-        answers = self.tokenizer.decode_batch(tgt_ids.cpu().tolist())
-        predictions = self.tokenizer.decode_batch(transformer.infer(src, tgt_r).cpu().tolist())
-        self.cache[key]["inputs"] = self.cache[key].get("inputs", list()) + inputs
-        self.cache[key]["answers"] = self.cache[key].get("answers", list()) + answers
-        self.cache[key]["predictions"] = self.cache[key].get("predictions", list()) + predictions
-        self.cache[key]["losses"] = self.cache[key].get("losses", list()) + losses
-        # to make them compatible with torchmetrics.functional.bleu_score()
-        answers = [[answer.split()] for answer in answers]
-        predictions = [prediction.split() for prediction in predictions]
-        return answers, predictions
 
     @torch.no_grad()
     def on_train_batch_end(
@@ -64,20 +33,6 @@ class LogCallback(Callback):
         transformer.log(
             "train/accuracy",
             metricsF.accuracy(out["logits"], tgt_ids, ignore_index=transformer.hparams["pad_token_id"]),
-            on_step=True,
-            on_epoch=True,
-        )
-        answers, predictions = self.on_any_batch_end(
-            "train", transformer, src, tgt_r, tgt_ids, out["losses"].cpu().tolist()
-        )
-        transformer.log(
-            "train/bleu",
-            metricsF.bleu_score(
-                answers,
-                predictions,
-                n_gram=transformer.hparams["n_gram"],
-                smooth=transformer.hparams["smooth"],
-            ),
             on_step=True,
             on_epoch=True,
         )
@@ -101,19 +56,6 @@ class LogCallback(Callback):
             metricsF.accuracy(out["logits"], tgt_ids, ignore_index=transformer.hparams["pad_token_id"]),
             on_epoch=True,
         )
-        answers, predictions = self.on_any_batch_end(
-            "validation", transformer, src, tgt_r, tgt_ids, out["losses"].cpu().tolist()
-        )
-        transformer.log(
-            "validation/bleu_epoch",
-            metricsF.bleu_score(
-                answers,
-                predictions,
-                n_gram=transformer.hparams["n_gram"],
-                smooth=transformer.hparams["smooth"],
-            ),
-            on_epoch=True,
-        )
 
     @torch.no_grad()
     def on_test_batch_end(
@@ -133,44 +75,50 @@ class LogCallback(Callback):
             metricsF.accuracy(out["logits"], tgt_ids, ignore_index=transformer.hparams["pad_token_id"]),
             on_epoch=True,
         )
-        answers, predictions = self.on_any_batch_end(
-            "test", transformer, src, tgt_r, tgt_ids, out["losses"].cpu().tolist()
-        )
-        transformer.log(
-            "test/bleu_epoch",
-            metricsF.bleu_score(
-                answers,
-                predictions,
-                n_gram=transformer.hparams["n_gram"],
-                smooth=transformer.hparams["smooth"],
-            ),
-            on_epoch=True,
-        )
 
     # --- for logging on epoch end --- #
-    @torch.no_grad()
-    def on_any_epoch_end(self, key: str):
+    def on_any_epoch_end(self, key: str, dataloader: DataLoader, transformer: Transformer):
         """
         log BLEU scores, along with qualitative infos
         """
-        inputs = self.cache[key]["inputs"]
-        predictions = self.cache[key]["predictions"]
-        answers = self.cache[key]["answers"]
-        losses = self.cache[key]["losses"]
+        inputs = list()
+        answers = list()
+        predictions = list()
+        losses = list()
+        for batch in dataloader:
+            src, tgt_r, tgt_ids = batch
+            inputs += self.tokenizer.decode_batch(src[:, 0].cpu().tolist())
+            answers += self.tokenizer.decode_batch(tgt_ids.cpu().tolist())
+            tgt_hat_ids, logits = transformer.infer(src, tgt_r)
+            predictions += self.tokenizer.decode_batch(tgt_hat_ids.cpu().tolist())
+            losses += (
+                torchF.cross_entropy(
+                    logits, tgt_ids, ignore_index=transformer.hparams["pad_token_id"], reduction="none"
+                )
+                .mean(dim=-1)
+                .cpu()
+                .tolist()
+            )  # (N, L) -> (N,) -> list
         wandb.log(
             {
                 f"{key}/examples": wandb.Table(
                     columns=["input", "prediction", "answer", "losses"],
                     data=list(zip(inputs, predictions, answers, losses)),
-                )
+                ),
+                f"{key}/bleu_epoch": metricsF.bleu_score(
+                    answers,
+                    predictions,
+                    n_gram=transformer.hparams["n_gram"],
+                    smooth=transformer.hparams["smooth"],
+                ),
             }
         )
 
-    def on_train_epoch_end(self, *args, **kwargs) -> None:
-        self.on_any_epoch_end("train")  # noqa
+    def on_train_epoch_end(self, trainer: Trainer, transformer: Transformer):
+        self.on_any_epoch_end("train", trainer.train_dataloader, transformer)
 
-    def on_validation_epoch_end(self, *args, **kwargs):
-        self.on_any_epoch_end("validation")  # noqa
+    def on_validation_epoch_end(self, trainer: Trainer, transformer: Transformer):
+        self.on_any_epoch_end("validation", trainer.val_dataloaders, transformer)
 
-    def on_test_epoch_end(self, *args, **kwargs):
-        self.on_any_epoch_end("test")  # noqa
+    def on_test_epoch_end(self, trainer: Trainer, transformer: Transformer):
+        self.on_any_epoch_end("test", trainer.test_dataloaders, transformer)

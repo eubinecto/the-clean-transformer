@@ -95,7 +95,7 @@ with wandb.init(project="cleanformer", config=config, tags=[__file__]):
                 verbose=config["verbose"],
                 every_n_epochs=config["every_n_epochs"],
                 save_on_train_epoch_end=config["save_on_train_epoch_end"],
-                save_last=config['save_last'],
+                save_last=config["save_last"],
             ),
             LearningRateMonitor(logging_interval="epoch"),
             LogCallback(tokenizer),

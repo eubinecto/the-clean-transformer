@@ -17,7 +17,8 @@ class Translator:
         x2y = [(sent, "") for sent in sentences]
         src = P.to_src(self.tokenizer, self.transformer.hparams["max_length"], x2y)
         tgt_r = P.to_tgt_r(self.tokenizer, self.transformer.hparams["max_length"], x2y)
-        tgt_hat_ids = self.transformer.infer(src, tgt_r).tolist()  # (N, L) -> list
+        tgt_hat_ids, _ = self.transformer.infer(src, tgt_r)
+        tgt_hat_ids = tgt_hat_ids.tolist()  # (N, L) -> list
         src_ids = src[:, 0].tolist()  # (N, 2, L) -> (N, L) -> list
         inputs = self.tokenizer.decode_batch(src_ids, skip_special_tokens=True)
         predictions = self.tokenizer.decode_batch(tgt_hat_ids, skip_special_tokens=True)

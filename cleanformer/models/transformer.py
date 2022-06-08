@@ -77,16 +77,13 @@ class Transformer(LightningModule):  # lgtm [py/missing-call-to-init]
         )  # ... -> (N, L, H)
         cls = self.token_embeddings.weight  # (|V|, H) -  reuse the embeddings as the classifier
         logits = torch.einsum("...lh,vh->...vl", hidden, cls)  # (N, |V|, L)
-        losses = torchF.cross_entropy(
-            logits,
-            tgt_ids,
-            ignore_index=self.hparams["pad_token_id"],
-            reduction="none",  # so that we can explore each instance by loss
-        )  # (N, |V|, L), (N, L) -> (N, L)
-        return losses, logits
+        loss = torchF.cross_entropy(
+            logits, tgt_ids, ignore_index=self.hparams["pad_token_id"]
+        )  # (N, |V|, L), (N, L) -> (1,)
+        return loss, logits
 
     @torch.no_grad()
-    def infer(self, src: torch.Tensor, tgt_r: torch.Tensor) -> torch.Tensor:
+    def infer(self, src: torch.Tensor, tgt_r: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor]:
         """
         An implementation of autoregressive inference
         """
@@ -115,7 +112,7 @@ class Transformer(LightningModule):  # lgtm [py/missing-call-to-init]
             tgt_r_key_padding_mask[:, t] = torch.where(  # noqa
                 tgt_r_ids[:, t] == self.hparams["eos_token_id"], 0, 1
             )
-        return tgt_r_ids
+        return tgt_r_ids, logits  # noqa
 
     def on_train_start(self):
         """
@@ -128,13 +125,8 @@ class Transformer(LightningModule):  # lgtm [py/missing-call-to-init]
 
     def training_step(self, batch: Tuple[torch.Tensor, torch.Tensor, torch.Tensor], *args, **kwargs) -> dict:
         src, tgt_r, tgt_ids = batch
-        losses, logits = self.step(src, tgt_r, tgt_ids)
-        return {
-            "loss": losses.mean(dim=-1).mean(dim=-1),  # (N, L) -> (N,)  -> (1,)
-            # --- for logging purposes --- #
-            "losses": losses.mean(dim=-1).detach(),  # (N, L) -> (N,)
-            "logits": logits.detach(),  # (N, |V|, L)
-        }
+        loss, logits = self.step(src, tgt_r, tgt_ids)
+        return {"loss": loss, "logits": logits.detach()}  # (N, L) -> (N,)  -> (1,)  # (N, |V|, L)
 
     @torch.no_grad()
     def validation_step(

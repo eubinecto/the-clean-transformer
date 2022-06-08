@@ -16,19 +16,16 @@ class LogCallback(Callback):
 
     def __init__(self, tokenizer: Tokenizer):
         self.tokenizer = tokenizer
-        self.cache = {"train": dict(), "validation": dict(), "test": dict()}
+        self.batches = {"train": list(), "validation": list(), "test": list()}
 
     def on_train_epoch_start(self, *args, **kwargs) -> None:
-        self.cache['train'].clear()
-        self.cache['train']['batches'] = list()
+        self.batches['train'].clear()
 
     def on_validation_epoch_start(self, *args, **kwargs) -> None:
-        self.cache['validation'].clear()
-        self.cache['validation']['batches'] = list()
+        self.batches['validation'].clear()
 
     def on_test_epoch_start(self, *args, **kwargs) -> None:
-        self.cache['test'].clear()
-        self.cache['test']['batches'] = list()
+        self.batches['test'].clear()
 
     @torch.no_grad()
     def on_train_batch_end(
@@ -49,7 +46,7 @@ class LogCallback(Callback):
             on_step=True,
             on_epoch=True,
         )
-        self.cache["train"]["batches"].append(batch)
+        self.batches["train"].append(batch)
 
     @torch.no_grad()
     def on_validation_batch_end(
@@ -70,7 +67,7 @@ class LogCallback(Callback):
             metricsF.accuracy(out["logits"], tgt_ids, ignore_index=transformer.hparams["pad_token_id"]),
             on_epoch=True,
         )
-        self.cache["validation"]["batches"].append(batch)
+        self.batches["validation"].append(batch)
 
     @torch.no_grad()
     def on_test_batch_end(
@@ -90,7 +87,7 @@ class LogCallback(Callback):
             metricsF.accuracy(out["logits"], tgt_ids, ignore_index=transformer.hparams["pad_token_id"]),
             on_epoch=True,
         )
-        self.cache["test"]["batches"].append(batch)
+        self.batches["test"].append(batch)
 
     # --- for logging on epoch end --- #
     def on_any_epoch_end(self, key: str, transformer: Transformer):
@@ -101,7 +98,7 @@ class LogCallback(Callback):
         answers = list()
         predictions = list()
         losses = list()
-        for batch in self.cache[key]['batches']:
+        for batch in self.batches[key]:
             src, tgt_r, tgt_ids = batch
             tgt_hat_ids, logits = transformer.infer(src, tgt_r)
             inputs += self.tokenizer.decode_batch(src[:, 0].cpu().tolist())

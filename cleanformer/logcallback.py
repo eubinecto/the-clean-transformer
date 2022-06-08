@@ -87,9 +87,9 @@ class LogCallback(Callback):
         losses = list()
         for batch in dataloader:
             src, tgt_r, tgt_ids = batch
+            tgt_hat_ids, logits = transformer.infer(src, tgt_r)
             inputs += self.tokenizer.decode_batch(src[:, 0].cpu().tolist())
             answers += self.tokenizer.decode_batch(tgt_ids.cpu().tolist())
-            tgt_hat_ids, logits = transformer.infer(src, tgt_r)
             predictions += self.tokenizer.decode_batch(tgt_hat_ids.cpu().tolist())
             losses += (
                 torchF.cross_entropy(
@@ -118,7 +118,7 @@ class LogCallback(Callback):
         self.on_any_epoch_end("train", trainer.train_dataloader, transformer)
 
     def on_validation_epoch_end(self, trainer: Trainer, transformer: Transformer):
-        self.on_any_epoch_end("validation", trainer.val_dataloaders, transformer)
+        self.on_any_epoch_end("validation", trainer.val_dataloaders[0], transformer)
 
     def on_test_epoch_end(self, trainer: Trainer, transformer: Transformer):
-        self.on_any_epoch_end("test", trainer.test_dataloaders, transformer)
+        self.on_any_epoch_end("test", trainer.test_dataloaders[0], transformer)

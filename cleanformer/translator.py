@@ -1,19 +1,24 @@
-from typing import Tuple
+from typing import Tuple, List
 from cleanformer.fetchers import fetch_config, fetch_transformer, fetch_tokenizer
 from cleanformer import preprocess as P  # noqa
 
 
 class Translator:
+    """
+    A Korean to English translator
+    """
+
     def __init__(self):
         config = fetch_config()["recommended"]
         self.transformer = fetch_transformer(config["transformer"]).eval()
         self.tokenizer = fetch_tokenizer(config["tokenizer"])
 
-    def __call__(self, kor: str) -> Tuple[str, str]:
-        x2y = [(kor, "")]
+    def __call__(self, sentences: List[str]) -> Tuple[List[str], List[str]]:
+        x2y = [(sent, "") for sent in sentences]
         src = P.to_src(self.tokenizer, self.transformer.hparams["max_length"], x2y)
         tgt_r = P.to_tgt_r(self.tokenizer, self.transformer.hparams["max_length"], x2y)
-        pred_ids = self.transformer.infer(src, tgt_r).squeeze().tolist()  # (1, L) -> (L) -> list
-        pred_ids = pred_ids[: pred_ids.index(self.tokenizer.eos_token_id)]  # noqa
-        src_ids = src[0, 0].tolist()  # (1, 2, L) -> (L) -> list
-        return self.tokenizer.decode(src_ids), self.tokenizer.decode(pred_ids)
+        tgt_hat_ids = self.transformer.infer(src, tgt_r).tolist()  # (N, L) -> list
+        src_ids = src[:, 0].tolist()  # (N, 2, L) -> (N, L) -> list
+        inputs = self.tokenizer.decode_batch(src_ids, skip_special_tokens=True)
+        predictions = self.tokenizer.decode_batch(tgt_hat_ids, skip_special_tokens=True)
+        return inputs, predictions

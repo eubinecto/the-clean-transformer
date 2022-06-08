@@ -62,7 +62,10 @@ class LogCallback(Callback):
         transformer.log("train/loss", out["loss"], on_step=True, on_epoch=True)
         transformer.log("train/perplexity", torch.exp(out["loss"]), on_step=True, on_epoch=True)
         transformer.log(
-            "train/accuracy", metricsF.accuracy(out["logits"], tgt_ids), on_step=True, on_epoch=True
+            "train/accuracy",
+            metricsF.accuracy(out["logits"], tgt_ids, ignore_index=transformer.hparams["pad_token_id"]),
+            on_step=True,
+            on_epoch=True,
         )
         answers, predictions = self.on_any_batch_end(
             "train", transformer, src, tgt_r, tgt_ids, out["losses"].cpu().tolist()
@@ -93,7 +96,11 @@ class LogCallback(Callback):
         src, tgt_r, tgt_ids = batch
         transformer.log("validation/loss_epoch", out["loss"], on_epoch=True)
         transformer.log("validation/perplexity_epoch", torch.exp(out["loss"]), on_epoch=True)
-        transformer.log("validation/accuracy_epoch", metricsF.accuracy(out["logits"], tgt_ids), on_epoch=True)
+        transformer.log(
+            "validation/accuracy_epoch",
+            metricsF.accuracy(out["logits"], tgt_ids, ignore_index=transformer.hparams["pad_token_id"]),
+            on_epoch=True,
+        )
         answers, predictions = self.on_any_batch_end(
             "validation", transformer, src, tgt_r, tgt_ids, out["losses"].cpu().tolist()
         )
@@ -122,7 +129,9 @@ class LogCallback(Callback):
         transformer.log("test/loss_epoch", out["loss"], on_epoch=True)
         transformer.log("test/perplexity_epoch", torch.exp(out["loss"]), on_epoch=True)
         transformer.log(
-            "test/accuracy_epoch", metricsF.accuracy(out["logits"], out["tgt_ids"]), on_epoch=True
+            "test/accuracy_epoch",
+            metricsF.accuracy(out["logits"], tgt_ids, ignore_index=transformer.hparams["pad_token_id"]),
+            on_epoch=True,
         )
         answers, predictions = self.on_any_batch_end(
             "test", transformer, src, tgt_r, tgt_ids, out["losses"].cpu().tolist()

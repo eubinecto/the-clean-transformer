@@ -34,6 +34,7 @@ optional.add_argument("--overfit_batches", type=int, default=0.0)
 optional.add_argument("--limit_train_batches", type=int, default=1.0)
 optional.add_argument("--limit_val_batches", type=int, default=1.0)
 optional.add_argument("--max_depth", type=int, default=4)
+optional.add_argument("--save_top_k", type=int, default=1)
 optional.add_argument("--num_workers", type=int, default=os.cpu_count())
 args = parser.parse_args()
 config = fetch_config()["transformer"]
@@ -65,7 +66,13 @@ val_dataloader = DataLoader(
     num_workers=config["num_workers"],
 )
 # --- instantiate the transformer to train --- #
-config.update({"vocab_size": tokenizer.get_vocab_size(), "pad_token_id": tokenizer.pad_token_id})  # noqa
+config.update(
+    {
+        "vocab_size": tokenizer.get_vocab_size(),
+        "pad_token_id": tokenizer.pad_token_id,  # noqa
+        "eos_token_id": tokenizer.eos_token_id,
+    }
+)  # noqa
 transformer = Transformer(**config)
 # --- start wandb context --- #
 with wandb.init(project="cleanformer", config=config, tags=[__file__]):
@@ -86,6 +93,9 @@ with wandb.init(project="cleanformer", config=config, tags=[__file__]):
             ModelSummary(max_depth=config["max_depth"]),
             ModelCheckpoint(
                 verbose=config["verbose"],
+                save_top_k=config["save_top_k"],
+                mode=config["mode"],
+                monitor=config["monitor"],
                 every_n_epochs=config["every_n_epochs"],
                 save_on_train_epoch_end=config["save_on_train_epoch_end"],
             ),

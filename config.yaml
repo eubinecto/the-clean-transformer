@@ -21,9 +21,9 @@ transformer:
   # for ReduceOnPlateau
   monitor: train/loss_epoch
   mode: min
-  patience: 3
+  patience: 2
   cooldown: 1
-  threshold: 0.001
+  threshold: 0.01
 
 # --- config for building a tokenizer --- #
 tokenizer:

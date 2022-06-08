@@ -99,16 +99,22 @@ class Transformer(LightningModule):  # lgtm [py/missing-call-to-init]
             tgt_r[:, 0].clone(),
             tgt_r[:, 1].clone(),
         )  # (N, 2, L) -> (N, L), (N, L)
-        for t in range(self.hparams["max_length"] - 1):
+        for t in range(1, self.hparams["max_length"]):
             hidden = self.forward(
                 src_ids, tgt_r_ids, src_key_padding_mask, tgt_r_key_padding_mask
             )  # ... -> (N, L, H)
             cls = self.token_embeddings.weight  # (|V|, H)
             logits = torch.einsum("...lh,vh->...lv", hidden, cls)  # (N, L, H) * (|V|, H) -> (N, L, |V|)
             probs = torch.softmax(logits, dim=-1)  # (N, L, |V|) -> (N, L, |V|)
-            indices = torch.argmax(probs, dim=-1)  # (N, L, |V|) -> (N, L)
-            tgt_r_ids[:, t + 1] = indices[:, t]  # replace paddings with the predictions
-            tgt_r_key_padding_mask[:, t + 1] = 1  # next tokens should not be ignored, so mask it
+            tgt_ids = torch.argmax(probs, dim=-1)  # (N, L, |V|) -> (N, L)
+            tgt_r_ids[:, t] = torch.where(  # noqa
+                tgt_r_ids[:, t - 1] == self.hparams["eos_token_id"],
+                self.hparams["eos_token_id"],
+                tgt_ids[:, t - 1],
+            )
+            tgt_r_key_padding_mask[:, t] = torch.where(  # noqa
+                tgt_r_ids[:, t] == self.hparams["eos_token_id"], 0, 1
+            )
         return tgt_r_ids
 
     def on_train_start(self):
@@ -155,7 +161,7 @@ class Transformer(LightningModule):  # lgtm [py/missing-call-to-init]
             mode=self.hparams["mode"],
             patience=self.hparams["patience"],
             cooldown=self.hparams["cooldown"],
-            threshold=self.hparams['threshold']
+            threshold=self.hparams["threshold"],
         )
         return {
             "optimizer": optimizer,

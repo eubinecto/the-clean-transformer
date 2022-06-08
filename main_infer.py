@@ -5,10 +5,12 @@ import argparse
 from cleanformer import preprocess as P  # noqa
 from cleanformer.translator import Translator
 
-
+sents = ["상황이 심각하다", "좋은 징조로 예상된다", "안녕하세요?"]
 parser = argparse.ArgumentParser()
-parser.add_argument("--kor", type=str, default="집이 정말 편안하네요")
 args = parser.parse_args()
 translator = Translator()
-kor, eng = translator(args.kor)
-print(kor, "->", eng)
+translator.transformer.hparams["eos_token_id"] = 3
+kors, engs = translator(sents)
+for res in list(zip(kors, engs)):
+    print(res[0])
+    print(res[1])

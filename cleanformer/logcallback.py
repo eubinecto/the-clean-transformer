@@ -16,10 +16,7 @@ class LogCallback(Callback):
 
     def __init__(self, tokenizer: Tokenizer):
         self.tokenizer = tokenizer
-        self.batches = {"train": list(), "validation": list(), "test": list()}
-
-    def on_train_epoch_start(self, *args, **kwargs) -> None:
-        self.batches['train'].clear()
+        self.batches = {"validation": list(), "test": list()}
 
     def on_validation_epoch_start(self, *args, **kwargs) -> None:
         self.batches['validation'].clear()
@@ -46,7 +43,6 @@ class LogCallback(Callback):
             on_step=True,
             on_epoch=True,
         )
-        self.batches["train"].append(batch)
 
     @torch.no_grad()
     def on_validation_batch_end(
@@ -100,10 +96,10 @@ class LogCallback(Callback):
         losses = list()
         for batch in self.batches[key]:
             src, tgt_r, tgt_ids = batch
-            tgt_hat_ids, logits = transformer.infer(src, tgt_r)
+            tgt, logits = transformer.decode(src, tgt_r)
             inputs += self.tokenizer.decode_batch(src[:, 0].cpu().tolist())
             answers += self.tokenizer.decode_batch(tgt_ids.cpu().tolist())
-            predictions += self.tokenizer.decode_batch(tgt_hat_ids.cpu().tolist())
+            predictions += self.tokenizer.decode_batch(tgt[:, 0].cpu().tolist())
             losses += (
                 torchF.cross_entropy(
                     logits, tgt_ids, ignore_index=transformer.hparams["pad_token_id"], reduction="none"
@@ -119,16 +115,14 @@ class LogCallback(Callback):
                     data=list(zip(inputs, predictions, answers, losses)),
                 ),
                 f"{key}/bleu_epoch": metricsF.bleu_score(
-                    answers,
-                    predictions,
+                    # see: explore/explore_torchmetrics_bleu.py
+                    [[answer.split()] for answer in answers],
+                    [prediction.split() for prediction in predictions],
                     n_gram=transformer.hparams["n_gram"],
                     smooth=transformer.hparams["smooth"],
                 ),
             }
         )
-
-    def on_train_epoch_end(self, trainer: Trainer, transformer: Transformer):
-        self.on_any_epoch_end("train", transformer)
 
     def on_validation_epoch_end(self, trainer: Trainer, transformer: Transformer):
         self.on_any_epoch_end("validation", transformer)

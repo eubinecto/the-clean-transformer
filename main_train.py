@@ -17,7 +17,7 @@ from cleanformer.paths import WANDB_DIR
 # https://github.com/kakaobrain/pororo/issues/69#issuecomment-927564132
 os.environ["TOKENIZERS_PARALLELISM"] = "true"
 
-
+config = fetch_config()["transformer"]
 parser = argparse.ArgumentParser()
 required = parser.add_argument_group("required arguments")
 required.add_argument("--max_epochs", type=int, required=True)
@@ -36,8 +36,8 @@ optional.add_argument("--limit_train_batches", type=int, default=1.0)
 optional.add_argument("--limit_val_batches", type=int, default=1.0)
 optional.add_argument("--max_depth", type=int, default=4)
 optional.add_argument("--num_workers", type=int, default=os.cpu_count())
+optional.add_argument("--dropout", type=float, default=config['dropout'])
 args = parser.parse_args()
-config = fetch_config()["transformer"]
 config.update(vars(args))
 # --- fetch a pre-trained tokenizer from wandb -- #
 tokenizer = fetch_tokenizer(config["tokenizer"])

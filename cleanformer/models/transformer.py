@@ -33,37 +33,15 @@ class Transformer(LightningModule):  # lgtm [py/missing-call-to-init]
 
     def forward(
         self,
-        src_ids: torch.Tensor,
-        tgt_r_ids: torch.Tensor,
-        src_key_padding_mask: torch.LongTensor,
-        tgt_r_key_padding_mask: torch.LongTensor,
+        src: torch.Tensor,
+        tgt_r: torch.Tensor
     ) -> torch.Tensor:
         """
-        :param src_ids (N, L)
-        :param tgt_r_ids (N, L)
-        :param src_key_padding_mask: (N, L)
-        :param tgt_r_key_padding_mask: (N, L)
-        :return hidden (N, L, H)
+        :param src (N, 2, L)
+        :param tgt_r (N, 2,  L)
+        :return logits (N, |V|, H)
         """
-        # --- lookup embedding vectors --- #
-        src_embeddings = self.token_embeddings(src_ids)  # (N, L) -> (N, L, H)
-        tgt_r_embeddings = self.token_embeddings(tgt_r_ids)  # (N, L) -> (N, L, H)
-        # --- encode positions (the positions are broadcast-added to N) --- #
-        src_embeddings += self.pos_encodings  # (N, L, H) + (L, H) -> (N, L, H)
-        tgt_r_embeddings += self.pos_encodings  # (N, L, H) + (L, H) -> (N, L, H)
-        # --- encode & decode --- #
-        memory = self.encoder.forward(src_embeddings, src_key_padding_mask)  # ... -> (N, L, H)
-        hidden = self.decoder.forward(
-            tgt_r_embeddings, memory, tgt_r_key_padding_mask, src_key_padding_mask
-        )  # ... (N, L, H)
-        return hidden
-
-    def step(
-        self, src: torch.Tensor, tgt_r: torch.Tensor, tgt_ids: torch.Tensor
-    ) -> Tuple[torch.Tensor, torch.Tensor]:
-        """
-        An implementation of autoregressive training
-        """
+        # --- unpack the batch --- #
         src_ids, src_key_padding_mask = (
             src[:, 0],
             src[:, 1],
@@ -72,47 +50,45 @@ class Transformer(LightningModule):  # lgtm [py/missing-call-to-init]
             tgt_r[:, 0],
             tgt_r[:, 1],
         )  # (N, 2, L) -> (N, L), (N, L)
-        hidden = self.forward(
-            src_ids, tgt_r_ids, src_key_padding_mask, tgt_r_key_padding_mask
-        )  # ... -> (N, L, H)
+        # --- lookup embeddings --- #
+        src_embeddings = self.token_embeddings(src_ids)  # (N, L) -> (N, L, H)
+        tgt_r_embeddings = self.token_embeddings(tgt_r_ids)  # (N, L) -> (N, L, H)
+        # --- encode positions --- #
+        src_embeddings += self.pos_encodings  # (N, L, H) + (L, H) -> (N, L, H)
+        tgt_r_embeddings += self.pos_encodings  # (N, L, H) + (L, H) -> (N, L, H)
+        # --- encode & decode --- #
+        memory = self.encoder.forward(src_embeddings, src_key_padding_mask)  # ... -> (N, L, H)
+        hidden = self.decoder.forward(
+            tgt_r_embeddings, memory, tgt_r_key_padding_mask, src_key_padding_mask
+        )
+        # --- classify --- #
         cls = self.token_embeddings.weight  # (|V|, H) -  reuse the embeddings as the classifier
         logits = torch.einsum("...lh,vh->...vl", hidden, cls)  # (N, |V|, L)
-        loss = torchF.cross_entropy(
-            logits, tgt_ids, ignore_index=self.hparams["pad_token_id"]
-        )  # (N, |V|, L), (N, L) -> (1,)
-        return loss, logits
+        return logits
 
     @torch.no_grad()
-    def infer(self, src: torch.Tensor, tgt_r: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor]:
+    def decode(self,
+               src: torch.Tensor,
+               tgt_r: torch.Tensor
+               ) -> Tuple[torch.Tensor, torch.Tensor]:
         """
-        An implementation of autoregressive inference
+        An implementation of autoregressive decoding (Greedy).
         """
-        src_ids, src_key_padding_mask = (
-            src[:, 0],
-            src[:, 1],
-        )  # (N, 2, L) -> (N, L), (N, L)
-        tgt_r_ids, tgt_r_key_padding_mask = (
-            # clone, to prevent possible issues due to in-place operations
-            tgt_r[:, 0].clone(),
-            tgt_r[:, 1].clone(),
-        )  # (N, 2, L) -> (N, L), (N, L)
+        tgt = tgt_r.clone()
+        tgt_ids, tgt_key_padding_mask = tgt[:, 0], tgt[:, 1]
         for t in range(1, self.hparams["max_length"]):
-            hidden = self.forward(
-                src_ids, tgt_r_ids, src_key_padding_mask, tgt_r_key_padding_mask
-            )  # ... -> (N, L, H)
-            cls = self.token_embeddings.weight  # (|V|, H)
-            logits = torch.einsum("...lh,vh->...vl", hidden, cls)  # (N, L, H) * (|V|, H) -> (N, L, |V|)
-            probs = torch.softmax(logits, dim=1)  # (N, |V|, L) -> (N, |V|, L)
-            tgt_ids = torch.argmax(probs, dim=1)  # (N, |V|, L) -> (N, L)
-            tgt_r_ids[:, t] = torch.where(  # noqa
-                tgt_r_ids[:, t - 1] == self.hparams["eos_token_id"],
+            logits = self.forward(src, tgt)  # ... -> (N, L, H)
+            probabilities = torch.softmax(logits, dim=1)  # (N, |V|, L) -> (N, |V|, L)
+            predictions = torch.argmax(probabilities, dim=1)  # (N, |V|, L) -> (N, L)
+            tgt_ids[:, t] = torch.where(  # noqa
+                tgt_ids[:, t - 1] == self.hparams["eos_token_id"],
                 self.hparams["eos_token_id"],
-                tgt_ids[:, t - 1],
+                predictions[:, t - 1],
             )
-            tgt_r_key_padding_mask[:, t] = torch.where(  # noqa
-                tgt_r_ids[:, t] == self.hparams["eos_token_id"], 0, 1
+            tgt_key_padding_mask[:, t] = torch.where(  # noqa
+                tgt_ids[:, t] == self.hparams["eos_token_id"], 0, 1
             )
-        return tgt_r_ids, logits  # noqa
+        return tgt, logits  # noqa
 
     def on_train_start(self):
         """
@@ -125,7 +101,10 @@ class Transformer(LightningModule):  # lgtm [py/missing-call-to-init]
 
     def training_step(self, batch: Tuple[torch.Tensor, torch.Tensor, torch.Tensor], *args, **kwargs) -> dict:
         src, tgt_r, tgt_ids = batch
-        loss, logits = self.step(src, tgt_r, tgt_ids)
+        logits = self.forward(src, tgt_r)
+        loss = torchF.cross_entropy(
+            logits, tgt_ids, ignore_index=self.hparams["pad_token_id"]
+        )  # (N, |V|, L), (N, L) -> (1,)
         return {"loss": loss, "logits": logits.detach()}  # (N, L) -> (N,)  -> (1,)  # (N, |V|, L)
 
     @torch.no_grad()

@@ -26,7 +26,7 @@ def main():
     )
     for batch in tqdm(test_dataloader):
         src, tgt_r, tgt = batch
-        tgt_hat = transformer.infer(src, tgt_r)  # this is the bottle-neck!
+        tgt_hat = transformer.decode(src, tgt_r)  # this is the bottle-neck!
         translations = tokenizer.decode_batch(tgt_hat.tolist())
         labels = tokenizer.decode_batch(tgt.tolist())
         print(translations)

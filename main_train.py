@@ -13,20 +13,20 @@ from cleanformer.logcallback import LogCallback
 from cleanformer.models.transformer import Transformer
 from cleanformer.paths import WANDB_DIR
 
-# to suppress warnings - we just allow parallelism
+# to suppress warnings - just allow parallelism
 # https://github.com/kakaobrain/pororo/issues/69#issuecomment-927564132
 os.environ["TOKENIZERS_PARALLELISM"] = "true"
-
+# --- parse required and optional arguments --- #
 config = fetch_config()["transformer"]
 parser = argparse.ArgumentParser()
 required = parser.add_argument_group("required arguments")
 required.add_argument("--max_epochs", type=int, required=True)
 required.add_argument("--batch_size", type=int, required=True)
-required.add_argument("--save_on_train_epoch_end", choices=(0, 1), type=int, required=True)
-required.add_argument("--every_n_epochs", type=int, required=True)
-required.add_argument("--log_every_n_steps", type=int, required=True)
-required.add_argument("--check_val_every_n_epoch", type=int, required=True)
 optional = parser.add_argument_group("optional arguments")
+optional.add_argument("--save_on_train_epoch_end", choices=(0, 1), type=int, default=1)
+optional.add_argument("--every_n_epochs", type=int, default=1)
+optional.add_argument("--log_every_n_steps", type=int, default=1)
+optional.add_argument("--check_val_every_n_epoch", type=int, default=1)
 optional.add_argument("--fast_dev_run", action="store_true", default=False)
 optional.add_argument("--detect_anomaly", action="store_true", default=False)
 optional.add_argument("--verbose", choices=(0, 1), type=int, default=1)  # could be int or str
@@ -107,5 +107,3 @@ with wandb.init(project="cleanformer", config=config, tags=[__file__]):
         train_dataloaders=train_dataloader,
         val_dataloaders=val_dataloader,
     )
-# sweep local logs after uploading is done
-shutil.rmtree(WANDB_DIR)
